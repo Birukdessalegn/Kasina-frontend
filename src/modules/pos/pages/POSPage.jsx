@@ -59,35 +59,76 @@ function POSPage() {
   // Helper to identify spirit/liquor bottle products that should open the portion serving modal
   const isSpiritOrLiquorProduct = (product) => {
     if (!product) return false;
-    const cat = (product.category_name || product.category || product.type || "").toLowerCase();
+
+    const catName = (product.category_name || product.category || "").toLowerCase();
+    const catType = (product.category_type || product.type || "").toLowerCase();
     const pName = (product.product_name || product.name || "").toLowerCase();
+    const menuType = (product.menu_type || product.menuType || "").toLowerCase();
+    const unit = (product.unit || "").toLowerCase();
 
-    const localMap = getCustomShotsMap();
-    const localData = localMap[String(product.id)] || localMap[String(product.product_code || product.productCode)];
-    const hasCustomShots =
-      Number(product.shots_capacity || product.shotsCapacity || localData?.shots || 0) > 0 ||
-      localData?.isShotItem === true;
+    // 1. Definite Food Check -> NEVER trigger shot portion modal for food!
+    const isFood =
+      menuType === "food" ||
+      catType === "food" ||
+      catName.includes("food") ||
+      catName.includes("dish") ||
+      catName.includes("grill") ||
+      catName.includes("kitchen") ||
+      catName.includes("traditional") ||
+      catName.includes("breakfast") ||
+      catName.includes("lunch") ||
+      catName.includes("dinner") ||
+      catName.includes("starter") ||
+      catName.includes("main") ||
+      catName.includes("snack") ||
+      catName.includes("dessert") ||
+      catName.includes("pizza") ||
+      catName.includes("burger") ||
+      catName.includes("sandwich") ||
+      catName.includes("salad") ||
+      catName.includes("soup") ||
+      ["plate", "portion", "pcs", "order", "bowl", "slice", "serving"].includes(unit);
 
-    const isShotItem =
-      product.is_shot_item === true ||
-      product.isShotItem === true ||
-      product.shots_capacity > 0 ||
-      product.shotsCapacity > 0 ||
-      hasCustomShots;
+    if (isFood) return false;
 
+    // 2. Soft drinks, beer, wine, water, tea, coffee -> directly added, NOT shots
+    const isNonSpiritDrink =
+      catName.includes("beer") ||
+      catName.includes("soft") ||
+      catName.includes("water") ||
+      catName.includes("juice") ||
+      catName.includes("soda") ||
+      catName.includes("hot drink") ||
+      catName.includes("coffee") ||
+      catName.includes("tea") ||
+      pName.includes("beer") ||
+      pName.includes("coca") ||
+      pName.includes("water") ||
+      pName.includes("sprite") ||
+      pName.includes("fanta") ||
+      pName.includes("pepsi") ||
+      pName.includes("espresso") ||
+      pName.includes("cappuccino") ||
+      pName.includes("macchiato");
+
+    if (isNonSpiritDrink) return false;
+
+    // 3. Spirits, Whiskey, Vodka, Gin, Rum, Tequila, Cognac, Liquor
     const isSpiritCat =
-      cat.includes("whiskey") ||
-      cat.includes("spirit") ||
-      cat.includes("liquor") ||
-      cat.includes("vodka") ||
-      cat.includes("gin") ||
-      cat.includes("rum") ||
-      cat.includes("tequila") ||
-      cat.includes("brandy") ||
-      cat.includes("cognac");
+      catName.includes("whiskey") ||
+      catName.includes("whisky") ||
+      catName.includes("spirit") ||
+      catName.includes("liquor") ||
+      catName.includes("vodka") ||
+      catName.includes("gin") ||
+      catName.includes("rum") ||
+      catName.includes("tequila") ||
+      catName.includes("brandy") ||
+      catName.includes("cognac");
 
     const isSpiritName =
       pName.includes("whiskey") ||
+      pName.includes("whisky") ||
       pName.includes("red label") ||
       pName.includes("black label") ||
       pName.includes("jack daniel") ||
@@ -95,18 +136,18 @@ function POSPage() {
       pName.includes("vodka") ||
       pName.includes("gin") ||
       pName.includes("rum") ||
-      pName.includes("tequila");
+      pName.includes("tequila") ||
+      pName.includes("brandy") ||
+      pName.includes("cognac");
 
-    const isBeerOrSoft =
-      cat.includes("beer") ||
-      cat.includes("soft") ||
-      cat.includes("water") ||
-      pName.includes("beer") ||
-      pName.includes("coca") ||
-      pName.includes("water");
+    // 4. Explicit shot configuration check (only if not food and explicitly marked for drink/liquor)
+    const localMap = getCustomShotsMap();
+    const localData = localMap[String(product.id)] || localMap[String(product.product_code || product.productCode)];
+    const isExplicitShot =
+      (product.is_shot_item === true || product.isShotItem === true || localData?.isShotItem === true) &&
+      (menuType === "drink" || catType === "beverage" || catType === "liquor" || isSpiritCat || isSpiritName);
 
-    if (isBeerOrSoft) return false;
-    return isShotItem || isSpiritCat || isSpiritName;
+    return isSpiritCat || isSpiritName || isExplicitShot;
   };
 
   const handleAddProduct = (product) => {

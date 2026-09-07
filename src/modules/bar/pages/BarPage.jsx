@@ -292,12 +292,22 @@ function BarPage() {
         pName.includes("bottle") ||
         pName.includes("cocktail");
 
+      const isFood =
+        (p.menu_type || "").toLowerCase() === "food" ||
+        (p.category_type || p.type || "").toLowerCase() === "food" ||
+        cat.includes("food") ||
+        cat.includes("dish") ||
+        cat.includes("kitchen") ||
+        cat.includes("traditional");
+
+      if (isFood) return false;
+
       return (
         isDrinkCat ||
         isDrinkName ||
         p.is_bar_item === true ||
         p.isBarItem === true ||
-        p.shots_capacity > 0 ||
+        (p.shots_capacity > 0 && !isFood) ||
         p.bottle_capacity > 0
       );
     }).map((p) => {
