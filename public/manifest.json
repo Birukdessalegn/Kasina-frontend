@@ -1,0 +1,22 @@
+{
+  "short_name": "Kasina Hotel",
+  "name": "KASINA HOTEL - Hotel Management System",
+  "icons": [
+    {
+      "src": "/kasina-hotel-logo.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512 1024x1024",
+      "purpose": "any"
+    },
+    {
+      "src": "/kasina-hotel-logo.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a1128",
+  "theme_color": "#0a1128",
+  "display": "standalone"
+}
