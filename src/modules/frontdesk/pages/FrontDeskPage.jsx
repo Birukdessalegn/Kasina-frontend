@@ -27,6 +27,7 @@ import {
   Eye,
   Check,
   Loader2,
+  Crown,
   Image as ImageIcon
 } from "lucide-react";
 import {
@@ -40,7 +41,8 @@ import {
   checkOutReservation,
   addReservationPayment,
   cancelReservation,
-  updateRoomStatus
+  updateRoomStatus,
+  getVipCustomers
 } from "../services/frontdeskApi";
 
 const STATUS_CONFIG = {
@@ -152,6 +154,7 @@ export default function FrontDeskPage() {
     guest_id_number: "",
     id_image_file: null,
     id_image_preview: null,
+    vip_customer_id: null,
     room_id: "",
     check_in_date: today,
     check_out_date: tomorrow,
@@ -164,6 +167,12 @@ export default function FrontDeskPage() {
     special_requests: "",
   });
 
+  // VIP Customer Directory & Search State
+  const [vipCustomers, setVipCustomers] = useState([]);
+  const [vipSearchQuery, setVipSearchQuery] = useState("");
+  const [selectedVip, setSelectedVip] = useState(null);
+  const [showVipDropdown, setShowVipDropdown] = useState(false);
+
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
@@ -172,14 +181,16 @@ export default function FrontDeskPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [roomsRes, typesRes, statsRes] = await Promise.all([
+      const [roomsRes, typesRes, statsRes, vipsRes] = await Promise.all([
         getRooms(),
         getRoomTypes(),
         getRoomStats(),
+        getVipCustomers().catch(() => ({ data: [] })),
       ]);
       setRooms(roomsRes.data || []);
       setRoomTypes(typesRes.data || []);
       setStats(statsRes.data || {});
+      setVipCustomers(vipsRes.data || []);
     } catch (err) {
       showToast(err.message || "Failed to load data", "error");
     } finally {
@@ -190,6 +201,42 @@ export default function FrontDeskPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Filtered VIP customers for the check-in autocomplete search
+  const filteredVipCustomers = useMemo(() => {
+    if (!vipSearchQuery.trim()) return vipCustomers.slice(0, 10);
+    const q = vipSearchQuery.toLowerCase();
+    return vipCustomers.filter(
+      (v) =>
+        v.name?.toLowerCase().includes(q) ||
+        v.phone?.toLowerCase().includes(q) ||
+        v.company?.toLowerCase().includes(q) ||
+        v.tier?.toLowerCase().includes(q)
+    );
+  }, [vipCustomers, vipSearchQuery]);
+
+  const handleSelectVip = (vip) => {
+    setSelectedVip(vip);
+    setShowVipDropdown(false);
+    setVipSearchQuery("");
+    setBookingForm((prev) => ({
+      ...prev,
+      guest_name: vip.name,
+      guest_phone: vip.phone || prev.guest_phone,
+      vip_customer_id: vip.id,
+      special_requests: vip.notes
+        ? `${prev.special_requests ? prev.special_requests + " | " : ""}VIP Note: ${vip.notes}`
+        : prev.special_requests,
+    }));
+  };
+
+  const handleClearVip = () => {
+    setSelectedVip(null);
+    setBookingForm((prev) => ({
+      ...prev,
+      vip_customer_id: null,
+    }));
+  };
 
   // Compute available floors
   const floors = useMemo(() => {
@@ -208,7 +255,8 @@ export default function FrontDeskPage() {
         const matchesNum = r.room_number.toLowerCase().includes(q);
         const matchesGuest = r.guest_name && r.guest_name.toLowerCase().includes(q);
         const matchesType = r.type_name && r.type_name.toLowerCase().includes(q);
-        if (!matchesNum && !matchesGuest && !matchesType) return false;
+        const matchesVip = (r.vip_name && r.vip_name.toLowerCase().includes(q)) || (r.vip_company && r.vip_company.toLowerCase().includes(q));
+        if (!matchesNum && !matchesGuest && !matchesType && !matchesVip) return false;
       }
       return true;
     });
@@ -218,6 +266,9 @@ export default function FrontDeskPage() {
   const handleOpenBooking = (room = null, type = "walkin") => {
     setSelectedRoom(room);
     setBookingType(type);
+    setSelectedVip(null);
+    setVipSearchQuery("");
+    setShowVipDropdown(false);
     const selectedTypeId = room ? room.room_type_id : (roomTypes[0]?.id || "");
     const matchingType = roomTypes.find((t) => t.id === selectedTypeId);
     const baseRate = room ? room.base_rate : (matchingType?.base_rate || "");
@@ -229,6 +280,7 @@ export default function FrontDeskPage() {
       guest_id_number: "",
       id_image_file: null,
       id_image_preview: null,
+      vip_customer_id: null,
       room_id: room ? String(room.id) : "",
       check_in_date: today,
       check_out_date: tomorrow,
@@ -622,9 +674,16 @@ export default function FrontDeskPage() {
                   {/* Occupied / Reserved Guest info */}
                   {room.status === "occupied" && (
                     <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50/50 p-3 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                        <User size={14} className="text-rose-600" />
-                        <span className="truncate">{room.guest_name}</span>
+                      <div className="flex items-center justify-between gap-1.5 font-bold text-slate-800">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <User size={14} className="text-rose-600 shrink-0" />
+                          <span className="truncate">{room.guest_name}</span>
+                        </div>
+                        {room.vip_tier && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-extrabold text-purple-900 border border-purple-200">
+                            👑 {room.vip_tier}
+                          </span>
+                        )}
                       </div>
                       {room.guest_phone && (
                         <div className="mt-1 flex items-center gap-1.5 text-slate-500">
@@ -871,6 +930,110 @@ export default function FrontDeskPage() {
                 >
                   📅 Advance Reservation
                 </button>
+              </div>
+
+              {/* VIP Customer Quick Search & Assign */}
+              <div className="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/70 to-indigo-50/50 p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-purple-950">
+                    <Crown size={15} className="text-purple-600" />
+                    👑 VIP Guest Quick Assignment
+                  </span>
+                  {selectedVip ? (
+                    <button
+                      type="button"
+                      onClick={handleClearVip}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 transition"
+                    >
+                      ✕ Clear VIP
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-purple-600 font-medium">Search Directory</span>
+                  )}
+                </div>
+
+                {selectedVip ? (
+                  <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-purple-200 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white font-black text-base shadow">
+                        👑
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-slate-900">{selectedVip.name}</span>
+                          <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-black text-purple-900 border border-purple-300">
+                            {selectedVip.tier || "VIP"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {selectedVip.phone} • {selectedVip.company || "VIP Member"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right text-xs">
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Credit Limit</span>
+                      <span className="font-extrabold text-purple-950">{Number(selectedVip.credit_limit || 0).toLocaleString()} ETB</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400" />
+                      <input
+                        type="text"
+                        placeholder="Search VIP by Name, Phone, or Company..."
+                        value={vipSearchQuery}
+                        onFocus={() => setShowVipDropdown(true)}
+                        onChange={(e) => {
+                          setVipSearchQuery(e.target.value);
+                          setShowVipDropdown(true);
+                        }}
+                        className="w-full rounded-xl border border-purple-200 bg-white pl-8 pr-8 py-2 text-xs text-slate-800 placeholder-purple-400/80 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200/50"
+                      />
+                      {vipSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setVipSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {showVipDropdown && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-xl border border-purple-200 bg-white p-1 shadow-2xl">
+                        {filteredVipCustomers.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-400">
+                            No matching VIP customer found
+                          </div>
+                        ) : (
+                          filteredVipCustomers.map((vip) => (
+                            <button
+                              key={vip.id}
+                              type="button"
+                              onClick={() => handleSelectVip(vip)}
+                              className="flex w-full items-center justify-between rounded-lg p-2.5 text-left hover:bg-purple-50 transition text-xs"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-base">👑</span>
+                                <div>
+                                  <div className="font-bold text-slate-900">{vip.name}</div>
+                                  <div className="text-[11px] text-slate-500">
+                                    {vip.phone} {vip.company ? `• ${vip.company}` : ""}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-900 border border-purple-200">
+                                {vip.tier || "VIP"}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Guest Details */}

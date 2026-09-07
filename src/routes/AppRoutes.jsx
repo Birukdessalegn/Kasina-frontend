@@ -67,7 +67,9 @@ import FinanceSalesPage from "../modules/finance/pages/FinanceSalesPage";
 
 import FrontDeskPage from "../modules/frontdesk/pages/FrontDeskPage";
 import ReservationsListPage from "../modules/frontdesk/pages/ReservationsListPage";
+import ReservationHistoryPage from "../modules/frontdesk/pages/ReservationHistoryPage";
 import RoomManagementPage from "../modules/frontdesk/pages/RoomManagementPage";
+import FrontDeskReportsPage from "../modules/frontdesk/pages/FrontDeskReportsPage";
 
 
 function AppRoutes() {
@@ -152,12 +154,16 @@ function AppRoutes() {
                 element={<ReservationsListPage />}
               />
               <Route
+                path="/frontdesk/history"
+                element={<ReservationHistoryPage />}
+              />
+              <Route
                 path="/frontdesk/rooms"
                 element={<RoomManagementPage />}
               />
               <Route
-                path="/frontdesk/guests"
-                element={<VipCustomersPage />}
+                path="/frontdesk/reports"
+                element={<FrontDeskReportsPage />}
               />
             </Route>
 

@@ -48,6 +48,7 @@ import {
   FileText,
   BedDouble,
   DoorClosed,
+  History,
 } from "lucide-react";
 
 /* =========================================================
@@ -89,9 +90,19 @@ const navigationGroups = [
             icon: CalendarDays,
           },
           {
+            name: "Reservation History",
+            path: "/frontdesk/history",
+            icon: History,
+          },
+          {
             name: "Room Management",
             path: "/frontdesk/rooms",
             icon: DoorClosed,
+          },
+          {
+            name: "Front Desk Reports",
+            path: "/frontdesk/reports",
+            icon: BarChart3,
           },
           {
             name: "Attendance Terminal",

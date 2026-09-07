@@ -3,7 +3,8 @@ import {
   BedDouble,
   CalendarCheck,
   DoorClosed,
-  Users,
+  History,
+  BarChart3,
   Clock,
   LogOut,
   User,
@@ -16,28 +17,33 @@ import AppHeader from "./AppHeader";
 const menuItems = [
   {
     name: "Room Front Desk",
-    path: "/reception/frontdesk",
+    path: "/frontdesk",
     icon: BedDouble,
     end: true,
   },
   {
     name: "Reservations",
-    path: "/reception/reservations",
+    path: "/frontdesk/reservations",
     icon: CalendarCheck,
   },
   {
+    name: "Reservation History",
+    path: "/frontdesk/history",
+    icon: History,
+  },
+  {
     name: "Rooms & Categories",
-    path: "/reception/rooms",
+    path: "/frontdesk/rooms",
     icon: DoorClosed,
   },
   {
-    name: "Guests",
-    path: "/reception/guests",
-    icon: Users,
+    name: "Front Desk Reports",
+    path: "/frontdesk/reports",
+    icon: BarChart3,
   },
   {
     name: "My Attendance",
-    path: "/reception/attendance",
+    path: "/employees/attendance",
     icon: Clock,
   },
 ];
@@ -48,13 +54,15 @@ function FrontDeskLayout() {
 
   const getPageTitle = () => {
     switch (location.pathname) {
-      case "/reception/reservations":
+      case "/frontdesk/reservations":
         return { title: "Room Reservations", desc: "Manage bookings, check-ins, and guest stays" };
-      case "/reception/rooms":
+      case "/frontdesk/history":
+        return { title: "Reservation History", desc: "View past stays, checked-out guests, and stay records" };
+      case "/frontdesk/rooms":
         return { title: "Room Management", desc: "Manage room inventory, pricing, and housekeeping" };
-      case "/reception/guests":
-        return { title: "Guest Directory", desc: "View and manage guest profiles and contact history" };
-      case "/reception/attendance":
+      case "/frontdesk/reports":
+        return { title: "Front Desk Reports", desc: "Room occupancy, daily revenue, and hotel analytics" };
+      case "/employees/attendance":
         return { title: "Staff Attendance", desc: "Clock in / out and view daily attendance" };
       default:
         return { title: "Front Desk & Room POS", desc: "Live room status, quick walk-ins, and check-out" };

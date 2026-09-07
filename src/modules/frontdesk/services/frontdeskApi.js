@@ -112,3 +112,14 @@ export const cancelReservation = (id, reason) =>
     method: "POST",
     body: JSON.stringify({ reason }),
   });
+
+export const getReservationReports = (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.startDate) query.append("startDate", params.startDate);
+  if (params.endDate) query.append("endDate", params.endDate);
+  const qStr = query.toString();
+  return api(`/room-reservations/reports/summary${qStr ? `?${qStr}` : ""}`);
+};
+
+export const getVipCustomers = () => api("/vip-customers");
+

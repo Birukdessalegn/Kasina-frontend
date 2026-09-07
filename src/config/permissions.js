@@ -52,8 +52,6 @@ export const ROLE_PERMISSIONS = {
     "rooms.manage",
     "reservations.view",
     "reservations.manage",
-    "customers.view",
-    "customers.create",
     "payments.create",
     "attendance.view",
     "attendance.manage",
