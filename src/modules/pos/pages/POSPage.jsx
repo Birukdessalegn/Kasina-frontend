@@ -402,23 +402,33 @@ function POSPage() {
           {/* Products */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             {/* Categories */}
-            <div className="flex gap-2">
-              {["all", "food", "drinks"].map((category) => (
+            <div className="flex gap-2 overflow-x-auto pb-1 max-w-full">
+              {(isBartender
+                ? [
+                    { id: "all", label: "All Drinks" },
+                    { id: "beers", label: "Beers & Ciders" },
+                    { id: "liquors", label: "Spirits & Liquors" },
+                    { id: "wines", label: "Wines" },
+                    { id: "soft_drinks", label: "Soft Drinks & Juices" },
+                    { id: "hot_drinks", label: "Hot Beverages" },
+                  ]
+                : [
+                    { id: "all", label: "All" },
+                    { id: "food", label: "Food" },
+                    { id: "drinks", label: "Drinks / Bar" },
+                  ]
+              ).map((category) => (
                 <button
-                  key={category}
+                  key={category.id}
                   type="button"
-                  onClick={() => setActiveCategory(category)}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                    activeCategory === category
-                      ? "bg-blue-600 text-white"
+                  onClick={() => setActiveCategory(category.id)}
+                  className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    activeCategory === category.id
+                      ? "bg-blue-600 text-white shadow-sm"
                       : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                   }`}
                 >
-                  {category === "all"
-                    ? "All"
-                    : category === "food"
-                    ? "Food"
-                    : "Drinks"}
+                  {category.label}
                 </button>
               ))}
             </div>
@@ -429,7 +439,7 @@ function POSPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search products..."
+                placeholder={isBartender ? "Search bar drinks..." : "Search products..."}
                 className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -441,6 +451,7 @@ function POSPage() {
               activeCategory={activeCategory}
               orderItems={orderItems}
               searchTerm={searchTerm}
+              isBartender={isBartender}
             />
           </div>
         </div>

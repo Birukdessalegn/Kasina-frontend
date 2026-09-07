@@ -444,28 +444,51 @@ function BarPage() {
   const getItemList = (order) => {
     if (!order) return [];
 
+    const isFoodItem = (itemName = "") => {
+      const lower = itemName.toLowerCase();
+      return (
+        lower.includes("tibs") ||
+        lower.includes("wat") ||
+        lower.includes("injera") ||
+        lower.includes("firfir") ||
+        lower.includes("burger") ||
+        lower.includes("pizza") ||
+        lower.includes("sandwich") ||
+        lower.includes("salad") ||
+        lower.includes("soup") ||
+        lower.includes("pasta") ||
+        lower.includes("steak") ||
+        lower.includes("chicken") ||
+        lower.includes("beef") ||
+        lower.includes("fish") ||
+        lower.includes("dish")
+      );
+    };
+
     const rawItems =
       order.items || order.order_items || order.orderItems || order.products;
     const items = parseItems(rawItems);
 
     if (items && items.length > 0) {
-      return items.map((item) => {
-        const quantity = Number(item.quantity || item.qty || 1);
-        const name =
-          item.product_name ||
-          item.name ||
-          item.title ||
-          item.item_name ||
-          item.productName ||
-          item.description ||
-          (item.productId || item.product_id
-            ? `Product #${item.productId || item.product_id}`
-            : "Drink Item");
+      return items
+        .filter((item) => !isFoodItem(item.product_name || item.name || item.title || item.item_name || ""))
+        .map((item) => {
+          const quantity = Number(item.quantity || item.qty || 1);
+          const name =
+            item.product_name ||
+            item.name ||
+            item.title ||
+            item.item_name ||
+            item.productName ||
+            item.description ||
+            (item.productId || item.product_id
+              ? `Product #${item.productId || item.product_id}`
+              : "Drink Item");
 
-        const price = Number(item.unit_price || item.price || item.product_price || 0);
-        const notes = item.notes || "";
-        return { quantity, name, price, notes };
-      });
+          const price = Number(item.unit_price || item.price || item.product_price || 0);
+          const notes = item.notes || "";
+          return { quantity, name, price, notes };
+        });
     }
 
     if (order.drink_name || order.product_name) {

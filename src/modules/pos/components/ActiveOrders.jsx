@@ -298,12 +298,100 @@ function ActiveOrders() {
   );
 
   const isWaiter = userRoleName === "waiter" || userRoleId === 6;
+  const isBartender = userRoleName === "bartender" || userRoleId === 8;
 
-  const userIdStr = String(user?.id || user?.user_id || user?.userId || "");
-  const employeeIdStr = String(user?.employee_id || user?.employeeId || "");
-  const userNameLower = (user?.username || user?.name || "").toLowerCase();
+  const isFoodNameOrCat = (name = "", cat = "") => {
+    const text = `${name} ${cat}`.toLowerCase();
+    return (
+      text.includes("tibs") ||
+      text.includes("wat") ||
+      text.includes("injera") ||
+      text.includes("firfir") ||
+      text.includes("burger") ||
+      text.includes("pizza") ||
+      text.includes("sandwich") ||
+      text.includes("salad") ||
+      text.includes("soup") ||
+      text.includes("pasta") ||
+      text.includes("steak") ||
+      text.includes("chicken") ||
+      text.includes("beef") ||
+      text.includes("fish") ||
+      text.includes("rice") ||
+      text.includes("dish") ||
+      text.includes("breakfast") ||
+      text.includes("kitchen") ||
+      text.includes("grill") ||
+      text.includes("food")
+    );
+  };
 
-  const visibleOrders = activeOrders;
+  const isDrinkNameOrCat = (name = "", cat = "") => {
+    if (isFoodNameOrCat(name, cat)) return false;
+    const text = `${name} ${cat}`.toLowerCase();
+    return (
+      text.includes("beer") ||
+      text.includes("draught") ||
+      text.includes("wine") ||
+      text.includes("whiskey") ||
+      text.includes("whisky") ||
+      text.includes("vodka") ||
+      text.includes("gin") ||
+      text.includes("rum") ||
+      text.includes("tequila") ||
+      text.includes("brandy") ||
+      text.includes("cognac") ||
+      text.includes("cider") ||
+      text.includes("water") ||
+      text.includes("juice") ||
+      text.includes("coca") ||
+      text.includes("sprite") ||
+      text.includes("fanta") ||
+      text.includes("pepsi") ||
+      text.includes("espresso") ||
+      text.includes("macchiato") ||
+      text.includes("latte") ||
+      text.includes("cappuccino") ||
+      text.includes("coffee") ||
+      text.includes("tea") ||
+      text.includes("cocktail") ||
+      text.includes("shot") ||
+      text.includes("drink") ||
+      text.includes("bar") ||
+      text.includes("beverage") ||
+      text.includes("liquor")
+    );
+  };
+
+  const visibleOrders = activeOrders
+    .filter((order) => {
+      if (isBartender) {
+        // Bartender must only see tickets with bar / drink items
+        const hasBarOrder = Boolean(order.barOrder);
+        const hasDrinkItems = (order.items || []).some((it) => {
+          const cat = it.category || it.category_name || it.category_type || "";
+          const name = it.product_name || it.name || it.title || "";
+          return isDrinkNameOrCat(name, cat);
+        });
+        return hasBarOrder || hasDrinkItems;
+      }
+      return true;
+    })
+    .map((order) => {
+      if (isBartender) {
+        // Filter items on ticket to ONLY drinks!
+        const drinkItemsOnly = (order.items || []).filter((it) => {
+          const cat = it.category || it.category_name || it.category_type || "";
+          const name = it.product_name || it.name || it.title || "";
+          return isDrinkNameOrCat(name, cat);
+        });
+        return {
+          ...order,
+          items: drinkItemsOnly,
+        };
+      }
+      return order;
+    });
 
   // ============================================================
   // FIND BAR ORDER FOR RESTAURANT ORDER
