@@ -75,6 +75,21 @@ export const createReservation = (data) =>
     body: JSON.stringify(data),
   });
 
+export const updateReservation = (id, data) =>
+  api(`/room-reservations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+
+export const uploadGuestIdImage = (id, file) => {
+  const formData = new FormData();
+  formData.append("id_image", file);
+  return api(`/room-reservations/${id}/upload-id`, {
+    method: "POST",
+    body: formData,
+  });
+};
+
 export const checkInReservation = (id) =>
   api(`/room-reservations/${id}/check-in`, {
     method: "POST",

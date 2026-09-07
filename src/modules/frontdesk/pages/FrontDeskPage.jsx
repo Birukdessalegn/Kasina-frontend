@@ -21,13 +21,21 @@ import {
   ChevronRight,
   Filter,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  Upload,
+  Eye,
+  Check,
+  Loader2,
+  Image as ImageIcon
 } from "lucide-react";
 import {
   getRooms,
   getRoomTypes,
   getRoomStats,
   createReservation,
+  updateReservation,
+  uploadGuestIdImage,
   checkInReservation,
   checkOutReservation,
   addReservationPayment,
@@ -96,7 +104,42 @@ export default function FrontDeskPage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_method: "cash", notes: "" });
 
+  // Update Check-In / Guest ID Modal (Mobile Friendly)
+  const [updateIdModalOpen, setUpdateIdModalOpen] = useState(false);
+  const [selectedResForUpdate, setSelectedResForUpdate] = useState(null);
+  const [idUpdateForm, setIdUpdateForm] = useState({
+    guest_name: "",
+    guest_id_number: "",
+    guest_phone: "",
+    special_requests: "",
+    id_image_file: null,
+    id_image_preview: null,
+    existing_id_image_url: "",
+  });
+  const [submittingIdUpdate, setSubmittingIdUpdate] = useState(false);
+
+  // Fullscreen ID Image Viewer Modal
+  const [idViewerModalOpen, setIdViewerModalOpen] = useState(false);
+  const [viewingIdImageUrl, setViewingIdImageUrl] = useState("");
+
   const [toast, setToast] = useState(null);
+
+  // Helper to build full backend image URL
+  const getFullImageUrl = (rawImage) => {
+    if (!rawImage) return "";
+    if (
+      rawImage.startsWith("data:") ||
+      rawImage.startsWith("http://") ||
+      rawImage.startsWith("https://")
+    ) {
+      return rawImage;
+    }
+    const backendBase =
+      import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
+      "http://localhost:5000";
+    const cleanPath = rawImage.startsWith("/") ? rawImage : `/${rawImage}`;
+    return `${backendBase}${cleanPath}`;
+  };
 
   // Booking Form State
   const today = new Date().toISOString().split("T")[0];
@@ -107,6 +150,8 @@ export default function FrontDeskPage() {
     guest_phone: "",
     guest_email: "",
     guest_id_number: "",
+    id_image_file: null,
+    id_image_preview: null,
     room_id: "",
     check_in_date: today,
     check_out_date: tomorrow,
@@ -182,6 +227,8 @@ export default function FrontDeskPage() {
       guest_phone: "",
       guest_email: "",
       guest_id_number: "",
+      id_image_file: null,
+      id_image_preview: null,
       room_id: room ? String(room.id) : "",
       check_in_date: today,
       check_out_date: tomorrow,
@@ -194,6 +241,65 @@ export default function FrontDeskPage() {
       special_requests: "",
     });
     setBookingModalOpen(true);
+  };
+
+  // Open Update ID Modal
+  const handleOpenUpdateIdModal = (room) => {
+    setSelectedResForUpdate(room);
+    setIdUpdateForm({
+      guest_name: room.guest_name || "",
+      guest_id_number: room.guest_id_number || "",
+      guest_phone: room.guest_phone || "",
+      special_requests: room.special_requests || "",
+      id_image_file: null,
+      id_image_preview: null,
+      existing_id_image_url: room.id_image_url || "",
+    });
+    setUpdateIdModalOpen(true);
+  };
+
+  // Submit Update ID Modal
+  const handleSaveIdUpdate = async (e) => {
+    e.preventDefault();
+    if (!selectedResForUpdate?.current_reservation_id) {
+      showToast("No active reservation to update", "error");
+      return;
+    }
+
+    try {
+      setSubmittingIdUpdate(true);
+      const resId = selectedResForUpdate.current_reservation_id;
+
+      // 1. If an image file was taken/selected, upload it
+      let uploadedUrl = null;
+      if (idUpdateForm.id_image_file) {
+        const uploadRes = await uploadGuestIdImage(resId, idUpdateForm.id_image_file);
+        uploadedUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+      }
+
+      // 2. Update guest details if changed
+      await updateReservation(resId, {
+        guest_name: idUpdateForm.guest_name,
+        guest_id_number: idUpdateForm.guest_id_number,
+        guest_phone: idUpdateForm.guest_phone,
+        special_requests: idUpdateForm.special_requests,
+        ...(uploadedUrl ? { id_image_url: uploadedUrl } : {}),
+      });
+
+      showToast("Check-In details and Guest ID updated successfully!");
+      setUpdateIdModalOpen(false);
+      loadData();
+    } catch (err) {
+      showToast(err.message || "Failed to update check-in", "error");
+    } finally {
+      setSubmittingIdUpdate(false);
+    }
+  };
+
+  // View Full ID Image
+  const handleViewIdImage = (imageUrl) => {
+    setViewingIdImageUrl(imageUrl);
+    setIdViewerModalOpen(true);
   };
 
   // Handle change in booking form dates/room to calculate total
@@ -223,16 +329,44 @@ export default function FrontDeskPage() {
     }
 
     try {
-      await createReservation({
+      const created = await createReservation({
         ...bookingForm,
         is_walkin: bookingType === "walkin",
       });
+
+      const resId = created?.data?.id;
+      if (resId && bookingForm.id_image_file) {
+        try {
+          await uploadGuestIdImage(resId, bookingForm.id_image_file);
+        } catch (uploadErr) {
+          console.warn("ID image upload warning:", uploadErr);
+        }
+      }
+
       showToast(
         bookingType === "walkin"
           ? "Guest checked in successfully!"
           : "Reservation confirmed successfully!"
       );
       setBookingModalOpen(false);
+      setBookingForm({
+        guest_name: "",
+        guest_phone: "",
+        guest_email: "",
+        guest_id_number: "",
+        id_image_file: null,
+        id_image_preview: null,
+        room_id: "",
+        check_in_date: today,
+        check_out_date: tomorrow,
+        adults: 1,
+        children: 0,
+        rate_per_night: "",
+        initial_payment: "",
+        payment_method: "cash",
+        transaction_reference: "",
+        special_requests: "",
+      });
       loadData();
     } catch (err) {
       showToast(err.message || "Failed to create booking", "error");
@@ -504,6 +638,36 @@ export default function FrontDeskPage() {
                           {room.check_out_date?.split("T")[0]}
                         </span>
                       </div>
+
+                      {/* Guest ID Status Badge */}
+                      <div className="mt-2 flex items-center justify-between border-t border-rose-100/60 pt-2 text-[11px]">
+                        <span className="text-slate-500 font-medium">Guest ID:</span>
+                        {room.id_image_url ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewIdImage(room.id_image_url);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-emerald-100/80 px-2 py-0.5 font-bold text-emerald-800 hover:bg-emerald-200 transition"
+                            title="Click to view ID card"
+                          >
+                            <Eye size={11} /> 🪪 ID Attached
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenUpdateIdModal(room);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-amber-100/90 px-2 py-0.5 font-bold text-amber-800 hover:bg-amber-200 transition"
+                            title="Snap or upload guest ID"
+                          >
+                            <Camera size={11} /> ⚠️ Upload ID
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -518,6 +682,36 @@ export default function FrontDeskPage() {
                         <span className="font-semibold text-slate-800">
                           {room.check_in_date?.split("T")[0]}
                         </span>
+                      </div>
+
+                      {/* Guest ID Status Badge */}
+                      <div className="mt-2 flex items-center justify-between border-t border-amber-100/60 pt-2 text-[11px]">
+                        <span className="text-slate-500 font-medium">Guest ID:</span>
+                        {room.id_image_url ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewIdImage(room.id_image_url);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-emerald-100/80 px-2 py-0.5 font-bold text-emerald-800 hover:bg-emerald-200 transition"
+                            title="Click to view ID card"
+                          >
+                            <Eye size={11} /> 🪪 ID Attached
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenUpdateIdModal(room);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-amber-100/90 px-2 py-0.5 font-bold text-amber-800 hover:bg-amber-200 transition"
+                            title="Snap or upload guest ID"
+                          >
+                            <Camera size={11} /> ⚠️ Upload ID
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -559,6 +753,14 @@ export default function FrontDeskPage() {
                   {room.status === "occupied" && (
                     <div className="flex gap-2">
                       <button
+                        onClick={() => handleOpenUpdateIdModal(room)}
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1 shadow-sm"
+                        title="Update guest details or snap ID with phone"
+                      >
+                        <Camera size={13} className="text-blue-600" />
+                        ID / Edit
+                      </button>
+                      <button
                         onClick={() => handleOpenCheckout(room)}
                         className="flex-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
                       >
@@ -569,6 +771,14 @@ export default function FrontDeskPage() {
 
                   {room.status === "reserved" && (
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleOpenUpdateIdModal(room)}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1 shadow-sm"
+                        title="Update guest details or upload ID photo"
+                      >
+                        <Camera size={13} className="text-blue-600" />
+                        ID
+                      </button>
                       <button
                         onClick={async () => {
                           try {
@@ -720,6 +930,102 @@ export default function FrontDeskPage() {
                       onChange={(e) => setBookingForm({ ...bookingForm, guest_id_number: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  {/* ID Card / Passport Photo Capture */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Camera size={14} className="text-blue-600" />
+                        Guest ID / Passport Photo (Camera or File)
+                      </span>
+                      {bookingForm.id_image_preview && (
+                        <button
+                          type="button"
+                          onClick={() => setBookingForm({ ...bookingForm, id_image_file: null, id_image_preview: null })}
+                          className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        >
+                          Remove Photo
+                        </button>
+                      )}
+                    </label>
+
+                    {bookingForm.id_image_preview ? (
+                      <div className="relative flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-2.5">
+                        <img
+                          src={bookingForm.id_image_preview}
+                          alt="ID Preview"
+                          className="h-16 w-24 rounded-lg object-cover border border-blue-200 shadow-sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">
+                            {bookingForm.id_image_file?.name || "Photo Captured"}
+                          </p>
+                          <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
+                            <Check size={12} /> ID photo ready to upload with check-in
+                          </p>
+                        </div>
+                        <label className="cursor-pointer rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm">
+                          Retake
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  setBookingForm({
+                                    ...bookingForm,
+                                    id_image_file: file,
+                                    id_image_preview: ev.target.result,
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-3.5 transition hover:border-blue-400 hover:bg-blue-50/30">
+                        <div className="flex items-center gap-2.5 text-slate-600">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                            <Camera size={16} />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-xs font-bold text-slate-800 block">
+                              Snap ID Photo with Camera or Upload
+                            </span>
+                            <span className="text-[11px] text-slate-500 block">
+                              Tap to open mobile camera or browse computer files
+                            </span>
+                          </div>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setBookingForm({
+                                  ...bookingForm,
+                                  id_image_file: file,
+                                  id_image_preview: ev.target.result,
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1010,6 +1316,285 @@ export default function FrontDeskPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================
+          MODAL: UPDATE CHECK-IN & GUEST ID (MOBILE FRIENDLY)
+      ==================================================== */}
+      {updateIdModalOpen && selectedResForUpdate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden my-6">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                  <Camera size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Update Check-In / Guest ID
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Room #{selectedResForUpdate.room_number} • {selectedResForUpdate.reservation_code || "Active Stay"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setUpdateIdModalOpen(false)}
+                className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-600 transition shadow-sm"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveIdUpdate} className="p-6 space-y-4">
+              {/* Photo Area */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                  <span>Guest ID / Passport Photo</span>
+                  {idUpdateForm.id_image_preview && (
+                    <button
+                      type="button"
+                      onClick={() => setIdUpdateForm({ ...idUpdateForm, id_image_file: null, id_image_preview: null })}
+                      className="text-xs text-rose-600 hover:underline font-semibold"
+                    >
+                      Clear New Photo
+                    </button>
+                  )}
+                </label>
+
+                {/* Show new preview if selected */}
+                {idUpdateForm.id_image_preview ? (
+                  <div className="relative rounded-2xl border-2 border-blue-400 bg-blue-50/40 p-3 text-center">
+                    <img
+                      src={idUpdateForm.id_image_preview}
+                      alt="New ID Preview"
+                      className="mx-auto max-h-52 w-full object-contain rounded-xl border border-blue-200 shadow-sm"
+                    />
+                    <p className="mt-2 text-xs font-semibold text-blue-700 flex items-center justify-center gap-1">
+                      <Check size={14} /> New photo captured - click Save to apply
+                    </p>
+                    <label className="mt-2.5 inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">
+                      <Camera size={14} className="text-blue-600" />
+                      Retake Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              setIdUpdateForm({
+                                ...idUpdateForm,
+                                id_image_file: file,
+                                id_image_preview: ev.target.result,
+                              });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : idUpdateForm.existing_id_image_url ? (
+                  /* Show existing photo with option to replace */
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-center">
+                    <div className="relative inline-block">
+                      <img
+                        src={getFullImageUrl(idUpdateForm.existing_id_image_url)}
+                        alt="Current ID"
+                        className="mx-auto max-h-44 w-full object-contain rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:opacity-90 transition"
+                        onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url)}
+                        className="absolute bottom-2 right-2 rounded-lg bg-slate-900/80 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm hover:bg-slate-900 flex items-center gap-1"
+                      >
+                        <Eye size={12} /> View Full
+                      </button>
+                    </div>
+                    <div className="mt-3 flex items-center justify-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition">
+                        <Camera size={14} />
+                        Snap New Photo with Phone
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setIdUpdateForm({
+                                  ...idUpdateForm,
+                                  id_image_file: file,
+                                  id_image_preview: ev.target.result,
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  /* No photo yet - prominent capture prompt */
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/30 p-6 transition hover:border-blue-500 hover:bg-blue-50/60">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20 mb-3">
+                      <Camera size={24} />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">
+                      Snap Guest ID with Phone Camera
+                    </span>
+                    <span className="text-xs text-slate-500 text-center mt-1">
+                      Tap here to open mobile camera, or choose a file from desktop
+                    </span>
+                    <span className="mt-3 inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-blue-600 shadow-sm">
+                      <Upload size={13} /> Open Camera / Browse
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setIdUpdateForm({
+                              ...idUpdateForm,
+                              id_image_file: file,
+                              id_image_preview: ev.target.result,
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Guest Details Edit */}
+              <div className="pt-2 border-t border-slate-100">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                  Guest Identification Details
+                </h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Guest Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={idUpdateForm.guest_name}
+                      onChange={(e) => setIdUpdateForm({ ...idUpdateForm, guest_name: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      ID / Passport Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. EP987654"
+                      value={idUpdateForm.guest_id_number}
+                      onChange={(e) => setIdUpdateForm({ ...idUpdateForm, guest_id_number: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Guest Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={idUpdateForm.guest_phone}
+                      onChange={(e) => setIdUpdateForm({ ...idUpdateForm, guest_phone: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setUpdateIdModalOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  disabled={submittingIdUpdate}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingIdUpdate}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                  {submittingIdUpdate ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} />
+                      Save Check-In Updates
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================
+          MODAL: FULLSCREEN GUEST ID IMAGE VIEWER
+      ==================================================== */}
+      {idViewerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
+          <div className="relative max-w-3xl w-full rounded-3xl bg-slate-900 p-4 shadow-2xl text-center">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-white">
+              <span className="text-sm font-bold flex items-center gap-2">
+                <Camera size={16} className="text-blue-400" />
+                Guest Identification Document
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={getFullImageUrl(viewingIdImageUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
+                >
+                  Open Original
+                </a>
+                <button
+                  onClick={() => setIdViewerModalOpen(false)}
+                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="py-4 flex items-center justify-center">
+              <img
+                src={getFullImageUrl(viewingIdImageUrl)}
+                alt="Full ID Document"
+                className="max-h-[75vh] w-auto max-w-full rounded-xl object-contain shadow-lg"
+              />
+            </div>
           </div>
         </div>
       )}

@@ -118,11 +118,6 @@ const navigationGroups = [
             icon: CheckCircle2,
           },
           {
-            name: "Attendance Terminal",
-            path: "/employees/attendance",
-            icon: UserCheck,
-          },
-          {
             name: "Daily Sales Audit",
             path: "/pos/sales-audit",
             icon: Receipt,
