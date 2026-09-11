@@ -775,9 +775,7 @@ export default function AdminDashboardPage() {
           pm.includes("credit") ||
           pm.includes("vip") ||
           ref.includes("vip") ||
-          ref.includes("credit") ||
-          item.payment_status === "paid" ||
-          parentOrder?.payment_status === "paid";
+          ref.includes("credit");
 
         if (isCreditIntent && registeredVips.length > 0) {
           matchedVip = registeredVips.find((v) => (v.tier || "").toLowerCase().includes("gold")) || registeredVips[0];
@@ -1699,16 +1697,15 @@ export default function AdminDashboardPage() {
 
 function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics = {}, formatMoney }) {
   const [chartTimeframe, setChartTimeframe] = useState("monthly"); // "daily" | "weekly" | "monthly"
-  const [activeIdx, setActiveIdx] = useState(5);
+  const [activeIdx, setActiveIdx] = useState(0);
 
-  const baseRevenue = metrics?.grossRevenue > 0 ? metrics.grossRevenue : 134789;
-  const baseExpenses = metrics?.totalExpenses > 0 ? metrics.totalExpenses : 120678;
-  const baseProfit = metrics?.netRevenue > 0 ? metrics.netRevenue : 245600;
+  const baseRevenue = metrics?.grossRevenue || 0;
+  const baseExpenses = metrics?.totalExpenses || 0;
+  const baseProfit = metrics?.netRevenue || 0;
 
   // Dynamic Trend Data Processing based on Selected Timeframe (Daily / Weekly / Monthly)
   const trendData = useMemo(() => {
     let points = [];
-    let factors = [];
     let getPeriodKey = (d) => "";
 
     if (chartTimeframe === "daily") {
@@ -1721,7 +1718,6 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
         { label: "Sat", x: 473 },
         { label: "Sun", x: 560 },
       ];
-      factors = [0.45, 0.65, 0.58, 0.82, 0.70, 1.00, 0.88];
       getPeriodKey = (d) => d.toLocaleDateString("en-US", { weekday: "short" });
     } else if (chartTimeframe === "weekly") {
       points = [
@@ -1730,7 +1726,6 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
         { label: "Wk 3", x: 386 },
         { label: "Wk 4", x: 560 },
       ];
-      factors = [0.60, 0.82, 0.75, 1.00];
       getPeriodKey = (d) => `Wk ${Math.min(Math.ceil(d.getDate() / 7), 4)}`;
     } else {
       // Monthly (Default)
@@ -1745,13 +1740,11 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
         { label: "Aug", x: 495 },
         { label: "Sep", x: 560 },
       ];
-      factors = [0.55, 0.72, 0.60, 0.85, 0.68, 1.00, 0.78, 0.92, 0.81];
       getPeriodKey = (d) => d.toLocaleDateString("en-US", { month: "short" });
     }
 
     const valMap = {};
     points.forEach((p) => { valMap[p.label] = 0; });
-    let hasRealData = false;
 
     // 1. Group real orders
     if (Array.isArray(orders) && orders.length > 0) {
@@ -1771,7 +1764,6 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
               const amt = Number(ord.total_amount || ord.total || ord.grand_total || 0);
               if (valMap[key] !== undefined) {
                 valMap[key] += amt;
-                if (amt > 0) hasRealData = true;
               }
             }
           }
@@ -1780,7 +1772,8 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
     }
 
     // 2. Or fallback to dashboardStats sales_chart
-    if (!hasRealData && dashboardStats) {
+    const hasOrderData = Object.values(valMap).some((v) => v > 0);
+    if (!hasOrderData && dashboardStats) {
       const chartList =
         dashboardStats.sales_chart ||
         dashboardStats.monthly_sales ||
@@ -1797,32 +1790,26 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
           const amt = Number(item.sales || item.revenue || item.total || 0);
           if (key && valMap[key] !== undefined) {
             valMap[key] += amt;
-            if (amt > 0) hasRealData = true;
           }
         });
       }
     }
 
-    const baseGross = baseRevenue;
     const revenues = points.map((p) => valMap[p.label] || 0);
-    const maxRev = Math.max(...revenues, baseGross, 1000);
+    const maxRev = Math.max(...revenues, 100);
 
-    return points.map((p, idx) => {
+    return points.map((p) => {
       const rev = valMap[p.label] || 0;
-      const displayRev = hasRealData
-        ? rev
-        : Math.round(baseGross * factors[idx % factors.length]);
-
-      const ratio = maxRev > 0 ? displayRev / maxRev : 0.5;
-      const y = Math.round(110 - ratio * 72);
+      const ratio = maxRev > 0 ? rev / maxRev : 0;
+      const y = Math.round(135 - ratio * 95);
 
       return {
         ...p,
-        income: displayRev,
+        income: rev,
         y,
       };
     });
-  }, [orders, dashboardStats, baseRevenue, chartTimeframe]);
+  }, [orders, dashboardStats, chartTimeframe]);
 
   const activePoint = trendData[activeIdx] || trendData[Math.min(activeIdx, trendData.length - 1)] || trendData[0];
 
@@ -1919,8 +1906,8 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
 
             <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-100/90 px-3 py-1 text-xs font-extrabold text-emerald-800 border border-emerald-300">
               <TrendingUp className="h-3.5 w-3.5" />
-              <span>34.67%</span>
-              <span className="text-slate-500 font-normal">vs previous period</span>
+              <span>Real Revenue</span>
+              <span className="text-slate-500 font-normal">• Live Synced</span>
             </div>
           </div>
 

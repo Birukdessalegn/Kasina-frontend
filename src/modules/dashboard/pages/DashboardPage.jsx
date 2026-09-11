@@ -98,11 +98,12 @@ export default function DashboardPage() {
                 category_name: p.category_name || (p.category_type === "bar" ? "Bar & Drinks" : "Kitchen Food"),
                 category_type: p.category_type || "food",
                 quantity_sold: qtySold,
-                revenue: itemRev > 0 ? itemRev : (qtySold > 0 ? qtySold * itemPrice : itemPrice),
+                revenue: itemRev > 0 ? itemRev : (qtySold * itemPrice),
               };
             });
 
-            // Sort by quantity_sold and revenue descending
+            // Only include products that have actual sales, sorted descending
+            topProds = topProds.filter((p) => p.quantity_sold > 0);
             topProds.sort((a, b) => b.revenue - a.revenue || b.quantity_sold - a.quantity_sold);
           }
         } catch (e) {
@@ -224,6 +225,16 @@ export default function DashboardPage() {
   const totalChartRevenue = useMemo(() => {
     return chartData.reduce((acc, curr) => acc + curr.sales, 0);
   }, [chartData]);
+
+  const peakDayLabel = useMemo(() => {
+    const peak = chartData.find((d) => d.isPeak && d.sales > 0);
+    return peak ? `${peak.label} (${formatMoney(peak.sales)})` : "No peak yet";
+  }, [chartData]);
+
+  const avgDailyRevenue = useMemo(() => {
+    if (!chartData.length) return 0;
+    return Math.round(totalChartRevenue / chartData.length);
+  }, [totalChartRevenue, chartData]);
 
   const totalItemsServed = useMemo(() => {
     if (!dashboard?.top_products || !Array.isArray(dashboard.top_products)) return 0;
@@ -526,7 +537,7 @@ export default function DashboardPage() {
                 </h2>
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                   <TrendingUp className="h-3 w-3" />
-                  +18.4%
+                  Live Sync
                 </span>
               </div>
               <p className="mt-1 text-xs text-slate-500">
@@ -647,12 +658,12 @@ export default function DashboardPage() {
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
-              <span>Highest Revenue Day: <strong className="text-slate-800">Saturday (Peak)</strong></span>
+              <span>Highest Revenue Day: <strong className="text-slate-800">{peakDayLabel}</strong></span>
             </div>
 
             <div className="flex items-center gap-2">
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>Avg Daily Revenue: <strong className="text-slate-800">{formatMoney(Math.round(totalChartRevenue / chartData.length))}</strong></span>
+              <span>Avg Daily Revenue: <strong className="text-slate-800">{formatMoney(avgDailyRevenue)}</strong></span>
             </div>
           </div>
         </div>
@@ -783,24 +794,26 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
   // Process live database top products strictly from registered products & orders
   const rawProducts = useMemo(() => {
     if (dashboard?.top_products && Array.isArray(dashboard.top_products) && dashboard.top_products.length > 0) {
-      return dashboard.top_products.map((p) => {
-        const qty = Number(p.quantity_sold || p.quantity || 0);
-        const unitPrice = Number(p.price || p.unit_price || p.cost_price || 0);
-        const rev = Number(p.revenue || p.total_revenue || 0);
+      return dashboard.top_products
+        .filter((p) => Number(p.quantity_sold || p.quantity || 0) > 0)
+        .map((p) => {
+          const qty = Number(p.quantity_sold || p.quantity || 0);
+          const unitPrice = Number(p.price || p.unit_price || p.cost_price || 0);
+          const rev = Number(p.revenue || p.total_revenue || 0);
 
-        // Total money obtained by serving this item (quantity * unitPrice or total revenue)
-        const finalRevenue = rev > 0 ? rev : (qty * unitPrice);
+          // Total money obtained by serving this item (quantity * unitPrice or total revenue)
+          const finalRevenue = rev > 0 ? rev : (qty * unitPrice);
 
-        return {
-          id: p.id,
-          name: p.name,
-          category: p.category_name || (p.category_type === "bar" ? "Bar & Drinks" : "Kitchen Food"),
-          categoryType: p.category_type || "food",
-          quantity: qty,
-          unitPrice: unitPrice,
-          revenue: finalRevenue,
-        };
-      });
+          return {
+            id: p.id,
+            name: p.name,
+            category: p.category_name || (p.category_type === "bar" ? "Bar & Drinks" : "Kitchen Food"),
+            categoryType: p.category_type || "food",
+            quantity: qty,
+            unitPrice: unitPrice,
+            revenue: finalRevenue,
+          };
+        });
     }
 
     // Strict real data mode: Return empty array when no orders have been placed yet
