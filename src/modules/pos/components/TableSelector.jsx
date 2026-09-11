@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { Wine, UtensilsCrossed, Armchair, Search, Sparkles, Coffee } from "lucide-react";
+import api from "../../../services/api";
 
 // Helper to determine if a table is a bar stool/counter seat
 export const isBarSeatTable = (table) => {
@@ -64,18 +65,7 @@ function TableSelector({
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/pos/tables`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to fetch tables");
-      }
-
+      const data = await api("/pos/tables");
       setTables(data.tables || data.data || (Array.isArray(data) ? data : []));
     } catch (error) {
       console.error("Fetch tables error:", error);
@@ -87,21 +77,10 @@ function TableSelector({
 
   const fetchActiveOrders = async () => {
     try {
-      const [posRes, kitchenRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/pos/orders`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }).catch(() => null),
-        fetch(`${import.meta.env.VITE_API_URL}/kitchen/orders`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }).catch(() => null),
+      const [posData, kitchenData] = await Promise.all([
+        api("/pos/orders").catch(() => ({})),
+        api("/kitchen/orders").catch(() => ({})),
       ]);
-
-      const posData = posRes && posRes.ok ? await posRes.json() : {};
-      const kitchenData = kitchenRes && kitchenRes.ok ? await kitchenRes.json() : {};
 
       const combined = [
         ...(posData.orders || posData.data || (Array.isArray(posData) ? posData : [])),

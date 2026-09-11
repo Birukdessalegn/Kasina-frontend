@@ -171,16 +171,23 @@ const fetchTables = async () => {
   // ============================================================
 
     useEffect(() => {
-       fetchKitchenOrders();
-      fetchTables();
+      // Only poll when an authenticated session exists
+      const token = localStorage.getItem("token");
+      if (token) {
+        fetchKitchenOrders();
+        fetchTables();
+      }
 
-  const interval = setInterval(() => {
-    fetchKitchenOrders();
-    fetchTables();
-  }, 5000);
+      const interval = setInterval(() => {
+        const activeToken = localStorage.getItem("token");
+        if (activeToken) {
+          fetchKitchenOrders();
+          fetchTables();
+        }
+      }, 5000);
 
-  return () => clearInterval(interval);
-}, []);
+      return () => clearInterval(interval);
+    }, []);
 
   // ============================================================
   // SEND ORDER TO KITCHEN

@@ -3,7 +3,17 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { UtensilsCrossed, Eye, EyeOff } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const resolveBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:5000/api";
+    }
+  }
+  return import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+};
+
+const API_URL = resolveBaseUrl();
 
 function LoginPage() {
   const { user, login } = useAuth();
