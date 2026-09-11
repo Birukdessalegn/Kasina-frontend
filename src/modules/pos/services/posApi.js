@@ -8,12 +8,14 @@ export const getCurrentShift = async () => {
   return await api('/pos/shifts/current');
 };
 
-export const startShift = async (openingCash = 0) => {
+export const startShift = async (openingCash = 0, outletId = null) => {
   return await api('/pos/shifts/start', {
     method: 'POST',
     body: JSON.stringify({
       opening_cash: Number(openingCash) || 0,
       openingCash: Number(openingCash) || 0,
+      outlet_id: outletId ? Number(outletId) : undefined,
+      outletId: outletId ? Number(outletId) : undefined,
     }),
   });
 };

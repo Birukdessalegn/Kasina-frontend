@@ -37,7 +37,7 @@ function DashboardRoleSwitch() {
   const { user } = useAuth();
   const normalizedRole = user?.role ? String(user.role).toUpperCase() : "";
 
-  if (normalizedRole === "ADMIN") {
+  if (["ADMIN", "HOTEL_MANAGER", "COOPERATIVE_MANAGER"].includes(normalizedRole)) {
     return <AdminDashboardPage />;
   }
   return <DashboardPage />;
@@ -70,6 +70,10 @@ import ReservationsListPage from "../modules/frontdesk/pages/ReservationsListPag
 import ReservationHistoryPage from "../modules/frontdesk/pages/ReservationHistoryPage";
 import RoomManagementPage from "../modules/frontdesk/pages/RoomManagementPage";
 import FrontDeskReportsPage from "../modules/frontdesk/pages/FrontDeskReportsPage";
+
+import RecipesPage from "../modules/kitchen/pages/RecipesPage";
+import HousekeepingPage from "../modules/housekeeping/pages/HousekeepingPage";
+import PayrollPage from "../modules/employees/pages/PayrollPage";
 
 
 function AppRoutes() {
@@ -164,6 +168,10 @@ function AppRoutes() {
               <Route
                 path="/frontdesk/reports"
                 element={<FrontDeskReportsPage />}
+              />
+              <Route
+                path="/housekeeping"
+                element={<HousekeepingPage />}
               />
             </Route>
 
@@ -271,6 +279,11 @@ function AppRoutes() {
               <Route
                 path="/kitchen/reports"
                 element={<KitchenReportsPage />}
+              />
+
+              <Route
+                path="/kitchen/recipes"
+                element={<RecipesPage />}
               />
             </Route>
 
@@ -417,6 +430,11 @@ function AppRoutes() {
             <Route
               path="/employees/attendance"
               element={<AttendancePage />}
+            />
+
+            <Route
+              path="/employees/payroll"
+              element={<PayrollPage />}
             />
 
 

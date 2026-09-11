@@ -385,7 +385,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Live Auto Refresh Toggle */}
           <button
             type="button"
@@ -513,7 +513,7 @@ export default function DashboardPage() {
             STYLISH BAR CHART
         ==================================================== */}
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm lg:col-span-2">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm lg:col-span-2">
           {/* Header & Controls */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -538,7 +538,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Timeframe Selector Buttons */}
-            <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+            <div className="flex flex-wrap items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setChartTimeframe("week")}
@@ -575,8 +575,8 @@ export default function DashboardPage() {
           </div>
 
           {/* BAR CHART GRAPH AREA */}
-          <div className="mt-8">
-            <div className="relative flex h-64 items-end gap-3 rounded-xl border border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-4">
+          <div className="mt-6 sm:mt-8 overflow-x-auto">
+            <div className="relative flex h-64 min-w-[320px] items-end gap-2 sm:gap-3 rounded-xl border border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-3 sm:p-4">
               {/* Background Grid Lines */}
               <div className="absolute inset-x-0 top-0 bottom-8 flex flex-col justify-between pointer-events-none px-4 opacity-40">
                 <div className="border-b border-dashed border-slate-200 w-full" />

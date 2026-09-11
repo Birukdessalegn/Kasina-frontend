@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   ChevronDown,
   Bell,
+  Menu,
+  X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useState, useRef, useEffect } from "react";
@@ -41,6 +43,7 @@ function POSLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
 
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -80,31 +83,54 @@ function POSLayout() {
   return (
     <div className="flex min-h-screen bg-slate-50">
 
+      {/* Mobile Backdrop */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
       {/* =====================================================
           SIDEBAR
       ====================================================== */}
 
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-slate-900 text-white">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-slate-900 text-white transition-transform duration-300 ${
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
+      >
 
         {/* Logo */}
 
-        <div className="flex h-20 items-center gap-3 border-b border-slate-800 px-5">
+        <div className="flex h-16 items-center justify-between border-b border-slate-800 px-5">
 
-          <img
-            src="/kasina-hotel-logo.png"
-            alt="Kasina Hotel"
-            className="h-10 w-10 shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-white/20"
-          />
+          <div className="flex items-center gap-3">
+            <img
+              src="/kasina-hotel-logo.png"
+              alt="Kasina Hotel"
+              className="h-9 w-9 shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-white/20"
+            />
 
-          <div>
-            <h1 className="text-lg font-black tracking-wide">
-              KASINA HOTEL
-            </h1>
+            <div>
+              <h1 className="text-sm font-black tracking-wide">
+                KASINA HOTEL
+              </h1>
 
-            <p className="text-xs text-slate-400">
-              POS & Service
-            </p>
+              <p className="text-xs text-slate-400">
+                POS & Service
+              </p>
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsMobileOpen(false)}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
 
         </div>
 
@@ -125,6 +151,7 @@ function POSLayout() {
                 key={item.path}
                 to={item.path}
                 end={item.path === "/pos"}
+                onClick={() => setIsMobileOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
                     isActive
@@ -191,21 +218,30 @@ function POSLayout() {
           MAIN AREA
       ====================================================== */}
 
-      <div className="ml-64 flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-300 ml-0 lg:ml-64">
 
 
         {/* =====================================================
             HEADER
         ====================================================== */}
 
-        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/80 px-4 md:px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/80 px-3 sm:px-6 backdrop-blur-md">
 
 
           {/* LEFT */}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
 
-            <div className="flex items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setIsMobileOpen(true)}
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden shrink-0"
+              aria-label="Open sidebar"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2 text-sm min-w-0">
 
               <span className="hidden sm:inline font-semibold text-slate-500">
                 {isReportsPage ? "Reports" : "Operations"}
@@ -215,9 +251,16 @@ function POSLayout() {
                 /
               </span>
 
-              <span className="font-bold text-blue-950 text-base md:text-lg tracking-tight">
+              <span className="font-bold text-blue-950 text-base md:text-lg tracking-tight truncate">
                 {isReportsPage ? "POS Reports" : "Point of Sale"}
               </span>
+
+              {user?.outletName && (
+                <span className="hidden xs:inline-flex ml-2 items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {user.outletName}
+                </span>
+              )}
 
             </div>
 
@@ -424,7 +467,7 @@ function POSLayout() {
             PAGE CONTENT
         ====================================================== */}
 
-        <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
+        <main className="min-w-0 max-w-full flex-1 px-3 py-4 sm:p-6 lg:p-8 overflow-x-hidden">
 
           <Outlet />
 

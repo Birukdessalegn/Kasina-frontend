@@ -1,9 +1,18 @@
 import { useState } from 'react';
-import { DollarSign, Clock, ShieldCheck, X } from 'lucide-react';
+import { DollarSign, Clock, ShieldCheck, X, Utensils, Wine, Coffee } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 import { startShift } from '../services/posApi';
 
 function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
+  const { user } = useAuth();
+  const roleUpper = (user?.role || '').toUpperCase();
+  const initialOutletId =
+    user?.outletId ||
+    user?.outlet_id ||
+    (roleUpper.includes('CAFE') || roleUpper === 'BARISTA' ? 2 : roleUpper === 'BARTENDER' ? 3 : 4);
+
   const [openingCash, setOpeningCash] = useState('');
+  const [selectedOutletId, setSelectedOutletId] = useState(initialOutletId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,7 +29,7 @@ function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
     try {
       setLoading(true);
       setError('');
-      const res = await startShift(cashVal);
+      const res = await startShift(cashVal, selectedOutletId);
       if (onShiftStarted) {
         onShiftStarted(res.data || res.shift);
       }
@@ -33,8 +42,8 @@ function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6 backdrop-blur-xs flex justify-center items-start sm:items-center">
+      <div className="w-full max-w-md my-4 sm:my-auto max-h-[86vh] flex flex-col rounded-2xl bg-white p-4 sm:p-6 shadow-2xl overflow-y-auto transition-all">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
@@ -74,6 +83,54 @@ function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
               {error}
             </div>
           )}
+
+          {/* Cashier Station / Venue */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              Operating Station / Venue
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedOutletId(4)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                  selectedOutletId === 4
+                    ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20 shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Utensils className="h-4 w-4 mb-1 text-blue-600" />
+                <span>Restaurant</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedOutletId(3)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                  selectedOutletId === 3
+                    ? 'border-amber-600 bg-amber-50 text-amber-800 ring-2 ring-amber-500/20 shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Wine className="h-4 w-4 mb-1 text-amber-600" />
+                <span>Main Bar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedOutletId(2)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                  selectedOutletId === 2
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20 shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Coffee className="h-4 w-4 mb-1 text-emerald-600" />
+                <span>Cafe & Bakery</span>
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Menu items, categories, and tables will adapt to this venue for your shift.
+            </p>
+          </div>
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">

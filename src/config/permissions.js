@@ -12,6 +12,7 @@ export const ROLES = {
   FINANCE: "FINANCE",
   FB_CONTROLLER: "FB_CONTROLLER",
   RECEPTIONIST: "RECEPTIONIST",
+  HOUSEKEEPER: "HOUSEKEEPER",
 };
 
 export const ROLE_PERMISSIONS = {
@@ -21,6 +22,7 @@ export const ROLE_PERMISSIONS = {
     "dashboard.view",
     "frontdesk.view",
     "frontdesk.manage",
+    "housekeeping.view",
     "rooms.view",
     "rooms.manage",
     "reservations.view",
@@ -42,12 +44,15 @@ export const ROLE_PERMISSIONS = {
     "reports.view",
     "finance.view",
     "cashier.reconcile",
+    "employees.view",
+    "payroll.view",
   ],
 
   [ROLES.RECEPTIONIST]: [
     "dashboard.view",
     "frontdesk.view",
     "frontdesk.manage",
+    "housekeeping.view",
     "rooms.view",
     "rooms.manage",
     "reservations.view",
@@ -55,6 +60,13 @@ export const ROLE_PERMISSIONS = {
     "payments.create",
     "attendance.view",
     "attendance.manage",
+  ],
+
+  [ROLES.HOUSEKEEPER]: [
+    "dashboard.view",
+    "frontdesk.view",
+    "housekeeping.view",
+    "rooms.view",
   ],
 
   [ROLES.FB_CONTROLLER]: [
@@ -123,6 +135,8 @@ export const ROLE_PERMISSIONS = {
     "reports.view",
     "finance.view",
     "cashier.reconcile",
+    "employees.view",
+    "payroll.view",
   ],
 
   [ROLES.FINANCE]: [
@@ -133,6 +147,8 @@ export const ROLE_PERMISSIONS = {
     "cashier.reconcile",
     "expenses.view",
     "reports.view",
+    "employees.view",
+    "payroll.view",
   ],
 
   [ROLES.HR]: [

@@ -361,7 +361,7 @@ function AttendancePage() {
       </div>
 
       {/* CASHIER QUICK CHECK-IN TERMINAL BAR */}
-      <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-6 text-white shadow-xl">
+      <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-4 sm:p-6 text-white shadow-xl">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-blue-300">
@@ -859,9 +859,9 @@ function AttendancePage() {
 
       {/* CHECK-IN CONFIRMATION MODAL */}
       {showCheckInModal && selectedTerminalEmp && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+        <div className="fixed inset-0 z-[120] overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm flex justify-center items-start sm:items-center">
+          <div className="relative w-full max-w-md my-4 sm:my-auto max-h-[86vh] flex flex-col rounded-2xl bg-white p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 overflow-y-auto">
+            <div className="shrink-0 flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-blue-600 font-bold text-lg">
                 <LogIn size={20} />
                 <span>Confirm Check-In</span>
@@ -936,9 +936,9 @@ function AttendancePage() {
 
       {/* SINGLE EMPLOYEE HISTORY DRAWER / MODAL */}
       {historyModalEmployee && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-gray-50">
+        <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm flex justify-center items-start sm:items-center">
+          <div className="relative w-full max-w-3xl my-4 sm:my-auto rounded-2xl bg-white shadow-2xl overflow-hidden max-h-[86vh] flex flex-col">
+            <div className="shrink-0 flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-gray-50">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
                   {getEmpName(historyModalEmployee)

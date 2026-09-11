@@ -12,16 +12,21 @@ import {
   UtensilsCrossed,
   Building2,
   CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../../../services/api";
 import StockTransferModal from "../components/StockTransferModal";
+import StoreGoodsReceiptModal from "../components/StoreGoodsReceiptModal";
 
 function InventoryPage() {
   const [inventoryList, setInventoryList] = useState([]);
   const [multiLocationList, setMultiLocationList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Store Goods Receipt Modal state
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   // Transfer Modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -165,6 +170,14 @@ function InventoryPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowReceiptModal(true)}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-500 transition"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Verify Incoming Deliveries
+          </button>
+
           <Link
             to="/inventory/reports"
             className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-slate-800 transition"
@@ -480,6 +493,13 @@ function InventoryPage() {
         onSuccess={fetchDashboardData}
         initialProduct={selectedTransferProduct}
         initialDepartment={selectedTransferDept}
+      />
+
+      {/* Store Goods Receipt Modal */}
+      <StoreGoodsReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        onSuccess={fetchDashboardData}
       />
     </div>
   );

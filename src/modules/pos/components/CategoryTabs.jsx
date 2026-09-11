@@ -1,11 +1,11 @@
 
 const categories = [
-  { id: "all", name: "All" },
-  { id: "food", name: "Food" },
-  { id: "drinks", name: "Drinks" },
-  { id: "bar", name: "Bar" },
-  { id: "desserts", name: "Desserts" },
-  { id: "specials", name: "Specials" },
+  { id: "all", name: "🌐 All" },
+  { id: "food", name: "🍽️ Food & Kitchen" },
+  { id: "drinks", name: "🍸 Bar & Drinks" },
+  { id: "cafe", name: "☕ Cafe & Bakery" },
+  { id: "desserts", name: "🍰 Desserts" },
+  { id: "specials", name: "⭐ Specials" },
 ];
 
 function CategoryTabs({ activeCategory = "all", onSelectCategory }) {

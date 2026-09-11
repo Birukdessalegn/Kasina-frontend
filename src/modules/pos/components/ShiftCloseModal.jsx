@@ -39,8 +39,8 @@ function ShiftCloseModal({ isOpen, onClose, currentShift, onShiftClosed }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl transition-all">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6 backdrop-blur-xs flex justify-center items-start sm:items-center">
+      <div className="w-full max-w-lg my-4 sm:my-auto max-h-[86vh] flex flex-col rounded-2xl bg-white p-4 sm:p-6 shadow-2xl overflow-y-auto transition-all">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">

@@ -564,9 +564,9 @@ export default function VipCustomersPage() {
 
       {/* CREATE / EDIT VIP CUSTOMER MODAL */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6 backdrop-blur-xs flex justify-center items-start sm:items-center">
+          <div className="relative w-full max-w-lg my-4 sm:my-auto max-h-[86vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-100 p-4 sm:p-6 pb-3">
               <div className="flex items-center gap-2">
                 <UserCheck className="h-6 w-6 text-amber-600" />
                 <h3 className="text-lg font-bold text-slate-900">
@@ -583,12 +583,12 @@ export default function VipCustomersPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700">
+              <div className="mx-4 sm:mx-6 mt-3 rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmitCustomer} className="space-y-4">
+            <form onSubmit={handleSubmitCustomer} className="flex-1 overflow-y-auto p-4 sm:p-6 pt-3 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Full Customer Name *
@@ -711,9 +711,9 @@ export default function VipCustomersPage() {
 
       {/* RECORD REPAYMENT MODAL */}
       {showRepayModal && selectedRepayCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6 backdrop-blur-xs flex justify-center items-start sm:items-center">
+          <div className="relative w-full max-w-md my-4 sm:my-auto max-h-[86vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-100 p-4 sm:p-6 pb-3">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-6 w-6 text-emerald-600" />
                 <h3 className="text-lg font-bold text-slate-900">
@@ -729,16 +729,17 @@ export default function VipCustomersPage() {
               </button>
             </div>
 
-            <div className="rounded-xl bg-amber-50 p-3 border border-amber-200 text-xs text-amber-900">
-              <p className="font-bold text-sm">{selectedRepayCustomer.name}</p>
-              <p>Current Debt: <span className="font-extrabold text-red-600">{Number(selectedRepayCustomer.current_debt).toLocaleString()} ETB</span></p>
-            </div>
-
-            {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700">
-                {error}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 pt-3 space-y-4">
+              <div className="rounded-xl bg-amber-50 p-3 border border-amber-200 text-xs text-amber-900">
+                <p className="font-bold text-sm">{selectedRepayCustomer.name}</p>
+                <p>Current Debt: <span className="font-extrabold text-red-600">{Number(selectedRepayCustomer.current_debt).toLocaleString()} ETB</span></p>
               </div>
-            )}
+
+              {error && (
+                <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700">
+                  {error}
+                </div>
+              )}
 
             <form onSubmit={handleRepaySubmit} className="space-y-4">
               <div>
@@ -803,6 +804,7 @@ export default function VipCustomersPage() {
             </form>
           </div>
         </div>
+      </div>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import { Wine, UtensilsCrossed, Armchair, Search, Sparkles } from "lucide-react";
+import { Wine, UtensilsCrossed, Armchair, Search, Sparkles, Coffee } from "lucide-react";
 
 // Helper to determine if a table is a bar stool/counter seat
 export const isBarSeatTable = (table) => {
@@ -18,6 +18,19 @@ export const isBarSeatTable = (table) => {
   );
 };
 
+// Helper to determine if a table is in the Cafe & Bakery section
+export const isCafeTable = (table) => {
+  if (!table) return false;
+  return (
+    table.outlet_id === 2 ||
+    table.type === "cafe" ||
+    table.section === "CAFE" ||
+    String(table.location || "").toLowerCase().includes("cafe") ||
+    String(table.table_number || "").toLowerCase().startsWith("cf") ||
+    String(table.table_number || "").toLowerCase().includes("cafe")
+  );
+};
+
 function TableSelector({
   tables: initialTables = [],
   loading: externalLoading,
@@ -32,10 +45,19 @@ function TableSelector({
   const [searchQuery, setSearchQuery] = useState("");
 
   const userRole = (user?.role || "").toUpperCase();
-  const isBartender = userRole === "BARTENDER" || user?.role_id === 8;
+  const userOutletCode = (user?.outletCode || user?.outlet_code || "").toUpperCase();
+  const userOutletId = user?.outletId || user?.outlet_id;
 
-  // Default active tab: If user is bartender, default to BAR seats!
-  const [activeTab, setActiveTab] = useState(isBartender ? "BAR" : "ALL");
+  const isCafeUser =
+    userRole.includes("CAFE") ||
+    userRole === "BARISTA" ||
+    userOutletCode === "CAFE" ||
+    userOutletId === 2;
+
+  const isBartender = userRole === "BARTENDER" || user?.role_id === 8 || userOutletCode === "BAR" || userOutletId === 3;
+
+  // Default active tab
+  const [activeTab, setActiveTab] = useState(isCafeUser ? "CAFE" : isBartender ? "BAR" : "ALL");
 
   const fetchTables = async () => {
     try {
@@ -115,8 +137,11 @@ function TableSelector({
   const counts = useMemo(() => {
     let barCount = 0;
     let diningCount = 0;
+    let cafeCount = 0;
     tables.forEach((t) => {
-      if (isBarSeatTable(t)) {
+      if (isCafeTable(t)) {
+        cafeCount++;
+      } else if (isBarSeatTable(t)) {
         barCount++;
       } else {
         diningCount++;
@@ -126,6 +151,7 @@ function TableSelector({
       all: tables.length,
       bar: barCount,
       dining: diningCount,
+      cafe: cafeCount,
     };
   }, [tables]);
 
@@ -133,9 +159,11 @@ function TableSelector({
   const filteredTables = useMemo(() => {
     return tables.filter((table) => {
       const isBar = isBarSeatTable(table);
+      const isCafe = isCafeTable(table);
 
       if (activeTab === "BAR" && !isBar) return false;
-      if (activeTab === "DINING" && isBar) return false;
+      if (activeTab === "CAFE" && !isCafe) return false;
+      if (activeTab === "DINING" && (isBar || isCafe)) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -222,6 +250,19 @@ function TableSelector({
             }`}
           >
             All ({counts.all})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("CAFE")}
+            className={`flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold transition ${
+              activeTab === "CAFE"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "text-emerald-800 hover:bg-emerald-100/60"
+            }`}
+          >
+            <Coffee className="h-3 w-3" />
+            Cafe ({counts.cafe})
           </button>
 
           <button
@@ -331,7 +372,7 @@ function TableSelector({
               (user?.username || user?.name) &&
               waiterName.toLowerCase().includes((user?.username || user?.name).toLowerCase()));
 
-          const canSelectTable = isAvailable || isMyTable || isManagerOrAdmin || (isBartender && isBar);
+          const canSelectTable = isAvailable || isMyTable || isManagerOrAdmin || (isBartender && isBar) || (isCafeUser && isCafe);
 
           return (
             <button

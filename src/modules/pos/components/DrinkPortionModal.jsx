@@ -66,10 +66,10 @@ function DrinkPortionModal({ product, onClose, onSelectPortion }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs p-3 sm:p-6 flex justify-center items-start sm:items-center animate-in fade-in duration-200">
+      <div className="w-full max-w-md my-4 sm:my-auto max-h-[86vh] flex flex-col rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
         {/* MODAL HEADER */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5 sm:px-5 sm:py-3.5 bg-slate-50/50">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5 sm:px-5 sm:py-3.5 bg-slate-50/50">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
             {imageUrl ? (
               <img

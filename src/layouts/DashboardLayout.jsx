@@ -49,6 +49,8 @@ import {
   BedDouble,
   DoorClosed,
   History,
+  Sparkles,
+  DollarSign,
 } from "lucide-react";
 
 /* =========================================================
@@ -98,6 +100,11 @@ const navigationGroups = [
             name: "Room Management",
             path: "/frontdesk/rooms",
             icon: DoorClosed,
+          },
+          {
+            name: "Housekeeping",
+            path: "/housekeeping",
+            icon: Sparkles,
           },
           {
             name: "Front Desk Reports",
@@ -158,6 +165,11 @@ const navigationGroups = [
             icon: ClipboardCheck,
           },
           {
+            name: "Recipes & BOM Costing",
+            path: "/kitchen/recipes",
+            icon: UtensilsCrossed,
+          },
+          {
             name: "F&B Reports",
             path: "/fb/reports",
             icon: FileText,
@@ -175,6 +187,11 @@ const navigationGroups = [
             name: "Kitchen Display (KDS)",
             path: "/kitchen",
             icon: Flame,
+          },
+          {
+            name: "Recipes & BOM Costing",
+            path: "/kitchen/recipes",
+            icon: UtensilsCrossed,
           },
           {
             name: "Live Kitchen Assets",
@@ -343,6 +360,11 @@ const navigationGroups = [
             name: "Attendance Log",
             path: "/employees/attendance",
             icon: Clock,
+          },
+          {
+            name: "Payroll Management",
+            path: "/employees/payroll",
+            icon: DollarSign,
           },
         ],
       },
@@ -1600,7 +1622,7 @@ function DashboardLayout() {
             BODY
         =================================================== */}
 
-        <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
+        <main className="min-w-0 max-w-full flex-1 px-3 py-4 sm:p-6 lg:p-8 overflow-x-hidden">
 
           <Outlet />
 

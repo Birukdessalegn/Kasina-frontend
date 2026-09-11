@@ -886,13 +886,13 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-8 p-4 sm:p-6 lg:p-8 bg-slate-50 text-slate-900 min-h-screen rounded-3xl">
+    <div className="space-y-6 sm:space-y-8 p-3 sm:p-6 lg:p-8 bg-slate-50 text-slate-900 min-h-screen rounded-2xl sm:rounded-3xl max-w-full overflow-hidden">
       {/* ============================================================
           EXECUTIVE COMMAND HEADER
       ============================================================ */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-6">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-xs">
               <Radio className="h-3.5 w-3.5 animate-pulse text-emerald-600" />
               LIVE HOTEL RADAR ACTIVE
@@ -903,8 +903,8 @@ export default function AdminDashboardPage() {
             </span>
           </div>
 
-          <h1 className="mt-2 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            👑 Owner Executive Command Center
+          <h1 className="mt-2 text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span>👑 Owner Executive Command Center</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Real-time floor radar, occupied tables, live pending tabs, and hotel revenue flow.
@@ -912,7 +912,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Live Refresh & Timeframe Selector Switch */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setShowVipPaymentsModal(true)}
@@ -1472,7 +1472,7 @@ export default function AdminDashboardPage() {
       {/* ============================================================
           BOTTOM SECTION: OWNER FINANCIAL TAX & NET EARNINGS BREAKDOWN
       ============================================================ */}
-      <div className="rounded-3xl border border-emerald-300 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 p-6 sm:p-8 text-white shadow-xl space-y-6">
+      <div className="rounded-2xl sm:rounded-3xl border border-emerald-300/80 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 p-4 sm:p-6 lg:p-8 text-white shadow-xl space-y-5 sm:space-y-6">
         <div className="flex flex-col gap-2 border-b border-slate-800 pb-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-400 border border-emerald-500/30">
@@ -1483,9 +1483,9 @@ export default function AdminDashboardPage() {
             </span>
             <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Government Tax & Take-Home Profit Breakdown</span>
           </div>
-          <h2 className="mt-1 text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <DollarSign className="h-7 w-7 text-emerald-400" />
-            Owner Financial Tax & Net Earnings Breakdown
+          <h2 className="mt-1 text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight flex items-center gap-2 sm:gap-3 flex-wrap">
+            <DollarSign className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-400 shrink-0" />
+            <span>Owner Financial Tax & Net Earnings Breakdown</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-400">
             Final executive statement for {timeframe === "today" ? "today" : "all-time"}: Gross sales, 15% VAT government tax, 10% staff service charge allocation, operating costs, and net owner profit.
@@ -1493,7 +1493,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* 5 FINANCIAL BREAKDOWN CARDS */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           {/* Gross Revenue */}
           <div className="rounded-xl bg-slate-900/90 p-3.5 border border-slate-800 space-y-1">
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Gross Business Revenue</p>

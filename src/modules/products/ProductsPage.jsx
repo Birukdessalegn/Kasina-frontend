@@ -60,9 +60,75 @@ export const setCustomProductShots = (productIdOrCode, shots, isShotItem = true)
   }
 };
 
+// Helpers to determine Venue / Menu allocation (Restaurant vs Bar vs Cafe)
+export const isBarProduct = (product) => {
+  if (!product) return false;
+  const catName = (product.category_name || product.category || "").toLowerCase();
+  const catType = (product.category_type || product.type || "").toLowerCase();
+  const prepCode = (product.preparation_outlet_code || "").toLowerCase();
+  const pName = (product.name || product.product_name || "").toLowerCase();
+
+  return (
+    prepCode === "bar" ||
+    catType === "liquor" ||
+    catType === "bar" ||
+    product.is_shot_item === true ||
+    product.isShotItem === true ||
+    catName.includes("beer") ||
+    catName.includes("wine") ||
+    catName.includes("cider") ||
+    catName.includes("spirit") ||
+    catName.includes("liquor") ||
+    catName.includes("whiskey") ||
+    catName.includes("vodka") ||
+    catName.includes("gin") ||
+    catName.includes("cocktail") ||
+    catName.includes("draught") ||
+    pName.includes("beer") ||
+    pName.includes("wine") ||
+    pName.includes("whiskey") ||
+    pName.includes("vodka")
+  );
+};
+
+export const isCafeProduct = (product) => {
+  if (!product) return false;
+  if (isBarProduct(product)) return false;
+  const catName = (product.category_name || product.category || "").toLowerCase();
+  const prepCode = (product.preparation_outlet_code || "").toLowerCase();
+  const pName = (product.name || product.product_name || "").toLowerCase();
+
+  return (
+    prepCode.includes("cafe") ||
+    catName.includes("hot beverage") ||
+    catName.includes("coffee") ||
+    catName.includes("tea") ||
+    catName.includes("juice") ||
+    catName.includes("soft") ||
+    catName.includes("pastry") ||
+    catName.includes("dessert") ||
+    catName.includes("bakery") ||
+    catName.includes("cake") ||
+    pName.includes("espresso") ||
+    pName.includes("cappuccino") ||
+    pName.includes("latte") ||
+    pName.includes("macchiato") ||
+    pName.includes("tea")
+  );
+};
+
+export const isRestaurantProduct = (product) => {
+  if (!product) return false;
+  if (isBarProduct(product)) return false;
+  if (isCafeProduct(product)) return false;
+  return true;
+};
+
 function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [outlets, setOutlets] = useState([]);
+  const [venueFilter, setVenueFilter] = useState("all"); // "all" | "restaurant" | "bar" | "cafe"
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,6 +165,8 @@ function ProductsPage() {
     isTodaysSpecial: false,
     shotsCapacity: "30",
     isShotItem: false,
+    venue: "restaurant", // "restaurant" | "bar" | "cafe"
+    preparationOutletId: "",
   });
 
   // ============================================================
@@ -192,6 +260,15 @@ function ProductsPage() {
     }
   };
 
+  const fetchOutlets = async () => {
+    try {
+      const response = await api("/products/outlets");
+      setOutlets(response.outlets || []);
+    } catch (error) {
+      console.warn("Failed to fetch outlets:", error);
+    }
+  };
+
   // ============================================================
   // INITIAL LOAD
   // ============================================================
@@ -203,6 +280,7 @@ function ProductsPage() {
       await Promise.all([
         fetchProducts(),
         fetchCategories(),
+        fetchOutlets(),
       ]);
 
       setLoading(false);
@@ -290,6 +368,8 @@ function ProductsPage() {
       isTodaysSpecial: false,
       shotsCapacity: "30",
       isShotItem: false,
+      venue: venueFilter !== "all" ? venueFilter : "restaurant",
+      preparationOutletId: "",
     });
 
     setShowModal(true);
@@ -319,6 +399,11 @@ function ProductsPage() {
       localData?.isShotItem ??
       (Number(resolvedShots) > 0);
 
+    const catName = (prod.category_name || "").toLowerCase();
+    const isBar = isBarProduct(prod);
+    const isCafe = isCafeProduct(prod);
+    const resolvedVenue = isBar ? "bar" : isCafe ? "cafe" : "restaurant";
+
     setForm({
       productCode: prod.product_code || prod.productCode || "",
       name: prod.name || "",
@@ -335,6 +420,8 @@ function ProductsPage() {
       isTodaysSpecial: prod.is_todays_special ?? prod.isTodaysSpecial ?? false,
       shotsCapacity: resolvedShots,
       isShotItem: Boolean(resolvedIsShotItem),
+      venue: resolvedVenue,
+      preparationOutletId: prod.preparation_outlet_id || prod.preparationOutletId || "",
     });
 
     setShowModal(true);
@@ -434,6 +521,11 @@ function ProductsPage() {
       formData.append("isTodaysSpecial", String(form.isTodaysSpecial));
       formData.append("is_todays_special", String(form.isTodaysSpecial));
 
+      if (form.preparationOutletId) {
+        formData.append("preparationOutletId", String(form.preparationOutletId));
+        formData.append("preparation_outlet_id", String(form.preparationOutletId));
+      }
+
       if (form.imageUrl.trim()) {
         formData.append("imageUrl", form.imageUrl.trim());
         formData.append("image_url", form.imageUrl.trim());
@@ -531,15 +623,23 @@ function ProductsPage() {
         String(product.category_id) ===
           String(categoryFilter);
 
+      const matchesVenue =
+        venueFilter === "all" ||
+        (venueFilter === "restaurant" && isRestaurantProduct(product)) ||
+        (venueFilter === "bar" && isBarProduct(product)) ||
+        (venueFilter === "cafe" && isCafeProduct(product));
+
       return (
         matchesSearch &&
-        matchesCategory
+        matchesCategory &&
+        matchesVenue
       );
     });
   }, [
     products,
     search,
     categoryFilter,
+    venueFilter,
   ]);
 
   // ============================================================
@@ -548,19 +648,9 @@ function ProductsPage() {
 
   const totalProducts = products.length;
 
-  const availableProducts = products.filter(
-    (product) => product.is_available
-  ).length;
-
-  const foodProducts = products.filter(
-    (product) =>
-      product.category_type === "food"
-  ).length;
-
-  const barProducts = products.filter(
-    (product) =>
-      product.category_type === "bar"
-  ).length;
+  const restaurantCount = products.filter(isRestaurantProduct).length;
+  const barCount = products.filter(isBarProduct).length;
+  const cafeCount = products.filter(isCafeProduct).length;
 
   // ============================================================
   // CATEGORY ICON
@@ -701,27 +791,27 @@ function ProductsPage() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
 
         <SummaryCard
-          title="Total Products"
+          title="All Menu Items"
           value={totalProducts}
           icon={Package}
         />
 
         <SummaryCard
-          title="Available"
-          value={availableProducts}
-          icon={CheckCircle2}
-        />
-
-        <SummaryCard
-          title="Food"
-          value={foodProducts}
+          title="🍽️ Restaurant Menu"
+          value={restaurantCount}
           icon={Utensils}
         />
 
         <SummaryCard
-          title="Bar"
-          value={barProducts}
+          title="🍸 Bar Menu"
+          value={barCount}
           icon={Wine}
+        />
+
+        <SummaryCard
+          title="☕ Cafe Menu"
+          value={cafeCount}
+          icon={Coffee}
         />
 
       </div>
@@ -731,6 +821,65 @@ function ProductsPage() {
       ====================================================== */}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+
+        {/* VENUE / MENU FILTER TABS */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 bg-slate-50/70">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 mr-1">
+            Menu View:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setVenueFilter("all")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              venueFilter === "all"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <span>🌐</span>
+            All Menus ({totalProducts})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVenueFilter("restaurant")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              venueFilter === "restaurant"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <span>🍽️</span>
+            Restaurant Menu ({restaurantCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVenueFilter("bar")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              venueFilter === "bar"
+                ? "bg-purple-700 text-white shadow-xs"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <span>🍸</span>
+            Bar Menu ({barCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVenueFilter("cafe")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              venueFilter === "cafe"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <span>☕</span>
+            Cafe Menu ({cafeCount})
+          </button>
+        </div>
 
         {/* Toolbar */}
 
@@ -1147,13 +1296,13 @@ function ProductsPage() {
       ====================================================== */}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-3 sm:p-6 backdrop-blur-sm flex justify-center items-start sm:items-center">
 
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+          <div className="relative my-4 sm:my-auto max-h-[86vh] w-full max-w-2xl flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
 
             {/* Modal Header */}
 
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-6 py-4">
 
               <div>
 
@@ -1180,8 +1329,131 @@ function ProductsPage() {
 
             <form
               onSubmit={handleCreateProduct}
-              className="space-y-5 p-6"
+              className="flex-1 space-y-5 overflow-y-auto p-6"
             >
+
+              {/* ======================================================
+                  TARGET MENU / VENUE SELECTOR (Restaurant, Bar, Cafe)
+              ====================================================== */}
+              <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-600" />
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+                      Target Menu / Operational Venue *
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Select where this item is served
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const kitOutlet = outlets.find(o => o.code === "RESTAURANT_KITCHEN" || o.type === "kitchen");
+                      setForm(prev => ({
+                        ...prev,
+                        venue: "restaurant",
+                        preparationOutletId: kitOutlet ? String(kitOutlet.id) : prev.preparationOutletId,
+                        unit: ["bottle", "shot", "glass"].includes(prev.unit) ? "plate" : prev.unit,
+                        isShotItem: false,
+                      }));
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition text-center cursor-pointer ${
+                      form.venue === "restaurant"
+                        ? "border-amber-500 bg-amber-50 text-amber-950 font-black shadow-xs ring-2 ring-amber-400/20"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="text-2xl mb-1">🍽️</span>
+                    <span className="text-xs font-bold">Restaurant Menu</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Food, Grills & Dishes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const barOutlet = outlets.find(o => o.code === "BAR" || o.type === "bar");
+                      setForm(prev => ({
+                        ...prev,
+                        venue: "bar",
+                        preparationOutletId: barOutlet ? String(barOutlet.id) : prev.preparationOutletId,
+                        unit: prev.unit === "plate" ? "bottle" : prev.unit,
+                        isShotItem: true,
+                      }));
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition text-center cursor-pointer ${
+                      form.venue === "bar"
+                        ? "border-purple-600 bg-purple-50 text-purple-950 font-black shadow-xs ring-2 ring-purple-400/20"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="text-2xl mb-1">🍸</span>
+                    <span className="text-xs font-bold">Bar Menu</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Liquor, Beers & Drinks</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cafeOutlet = outlets.find(o => o.code === "CAFE_KITCHEN" || o.code === "CAFE");
+                      setForm(prev => ({
+                        ...prev,
+                        venue: "cafe",
+                        preparationOutletId: cafeOutlet ? String(cafeOutlet.id) : prev.preparationOutletId,
+                        unit: ["plate", "bottle"].includes(prev.unit) ? "cup" : prev.unit,
+                        isShotItem: false,
+                      }));
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition text-center cursor-pointer ${
+                      form.venue === "cafe"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-400/20"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="text-2xl mb-1">☕</span>
+                    <span className="text-xs font-bold">Cafe Menu</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Coffee, Teas & Pastries</span>
+                  </button>
+                </div>
+
+                {/* TICKET ROUTING STATION */}
+                <div className="pt-2 border-t border-slate-200/60">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                    <label className="text-[11px] font-extrabold uppercase text-slate-700 tracking-wide">
+                      Order Routing / Preparation Station
+                    </label>
+                    <span className="text-[10px] text-slate-500">
+                      Where should this ticket print/display when ordered at POS?
+                    </span>
+                  </div>
+                  <select
+                    name="preparationOutletId"
+                    value={form.preparationOutletId}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
+                  >
+                    <option value="">-- Automatic Routing by Category --</option>
+                    {outlets.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.code === "RESTAURANT_KITCHEN"
+                          ? "🍳 Restaurant Kitchen (KDS Display)"
+                          : o.code === "BAR"
+                          ? "🍸 Main Bar Counter (Display & Drinks Ticket)"
+                          : o.code === "CAFE_KITCHEN"
+                          ? "☕ Cafe Kitchen / Bakery Station"
+                          : o.code === "CAFE"
+                          ? "☕ Cafe Service Counter"
+                          : o.code === "RESTAURANT"
+                          ? "🍽️ Restaurant Service Station"
+                          : o.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               {/* Name + Code */}
 
@@ -1228,18 +1500,41 @@ function ProductsPage() {
                   >
 
                     <option value="">
-                      Select category
+                      -- Select category --
                     </option>
 
-                    {categories.map(
-                      (category) => (
-                        <option
-                          key={category.id}
-                          value={category.id}
-                        >
+                    <optgroup label="🍽️ Restaurant & Kitchen Categories">
+                      {categories.filter(c => (c.type || '').toLowerCase() === 'food').map((category) => (
+                        <option key={category.id} value={category.id}>
                           {category.name}
                         </option>
-                      )
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="🍸 Bar & Liquor Categories">
+                      {categories.filter(c => ['liquor', 'bar'].includes((c.type || '').toLowerCase()) || c.name.toLowerCase().includes('beer') || c.name.toLowerCase().includes('wine') || c.name.toLowerCase().includes('spirit')).map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="☕ Cafe & Beverage Categories">
+                      {categories.filter(c => (c.type || '').toLowerCase() === 'beverage' && !c.name.toLowerCase().includes('beer') && !c.name.toLowerCase().includes('wine')).map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    {categories.some(c => !['food', 'liquor', 'bar', 'beverage'].includes((c.type || '').toLowerCase())) && (
+                      <optgroup label="📦 General Categories">
+                        {categories.filter(c => !['food', 'liquor', 'bar', 'beverage'].includes((c.type || '').toLowerCase())).map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     )}
 
                   </select>

@@ -3,7 +3,7 @@ import { DollarSign, Clock, AlertCircle, CheckCircle, ShieldCheck } from 'lucide
 function CashierShiftBanner({ currentShift, loadingShift, onStartShiftClick, onCloseShiftClick }) {
   if (loadingShift) {
     return (
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-xs animate-pulse">
+      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3.5 sm:px-5 py-3 shadow-xs animate-pulse">
         <div className="h-4 w-48 rounded bg-slate-200" />
         <div className="h-8 w-24 rounded-lg bg-slate-200" />
       </div>
@@ -12,7 +12,7 @@ function CashierShiftBanner({ currentShift, loadingShift, onStartShiftClick, onC
 
   if (!currentShift) {
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-linear-to-r from-amber-50 to-orange-50 px-5 py-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-3.5 sm:px-5 py-3 sm:py-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
             <AlertCircle className="h-5 w-5" />
@@ -28,7 +28,7 @@ function CashierShiftBanner({ currentShift, loadingShift, onStartShiftClick, onC
         <button
           type="button"
           onClick={onStartShiftClick}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.99] transition"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.99] transition w-full sm:w-auto shrink-0"
         >
           <DollarSign className="h-4 w-4" />
           Start Shift
@@ -41,7 +41,7 @@ function CashierShiftBanner({ currentShift, loadingShift, onStartShiftClick, onC
   const openingCash = parseFloat(currentShift.opening_cash || 0);
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-linear-to-r from-emerald-50 via-teal-50/40 to-white px-5 py-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50/40 to-white px-3.5 sm:px-5 py-3 sm:py-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
           <ShieldCheck className="h-5 w-5" />
@@ -64,7 +64,7 @@ function CashierShiftBanner({ currentShift, loadingShift, onStartShiftClick, onC
       <button
         type="button"
         onClick={onCloseShiftClick}
-        className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-800 shadow-xs hover:bg-amber-50 active:scale-[0.99] transition"
+        className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-800 shadow-xs hover:bg-amber-50 active:scale-[0.99] transition w-full sm:w-auto shrink-0"
       >
         <Clock className="h-4 w-4 text-amber-600" />
         End Shift & Handover

@@ -157,10 +157,10 @@ function EditOrderModal({ isOpen, onClose, order, onOrderUpdated }) {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="flex h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6 backdrop-blur-xs flex justify-center items-start sm:items-center">
+      <div className="flex max-h-[86vh] w-full max-w-4xl my-4 sm:my-auto flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50">
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-slate-900">

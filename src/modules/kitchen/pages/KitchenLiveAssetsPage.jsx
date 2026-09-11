@@ -294,8 +294,8 @@ function KitchenLiveAssetsPage() {
         </div>
 
         {/* TOP TAB SWITCHER: KDS ORDERS vs LIVE ASSETS */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-xs">
             <Link
               to="/kitchen"
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition"

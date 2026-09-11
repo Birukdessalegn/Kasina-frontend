@@ -12,6 +12,7 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
   const [alertOrder, setAlertOrder] = useState(null);
   const [kitchenStock, setKitchenStock] = useState([]);
   const [activeTab, setActiveTab] = useState("orders"); // "orders" | "inventory"
+  const [kitchenOutletFilter, setKitchenOutletFilter] = useState("all"); // "all" | "CAFE_KITCHEN" | "RESTAURANT_KITCHEN"
 
   const prevOrdersRef = useRef(null);
 
@@ -39,11 +40,16 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
     return kitchenOrders;
   }, [kitchenOrders, filterStatus]);
 
-  const fetchKitchenOrders = async () => {
+  const fetchKitchenOrders = async (outlet = kitchenOutletFilter) => {
     try {
       setError("");
 
-      const response = await api("/kitchen");
+      const queryUrl =
+        outlet && outlet !== "all"
+          ? `/kitchen?kitchen_outlet_id=${encodeURIComponent(outlet)}`
+          : "/kitchen";
+
+      const response = await api(queryUrl);
       console.log("KITCHEN FETCH RESPONSE:", response);
 
       const orders =
@@ -81,10 +87,12 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
   };
 
   useEffect(() => {
-    fetchKitchenOrders();
-    const interval = setInterval(fetchKitchenOrders, 4000);
+    fetchKitchenOrders(kitchenOutletFilter);
+    const interval = setInterval(() => {
+      fetchKitchenOrders(kitchenOutletFilter);
+    }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [kitchenOutletFilter]);
 
   const handleAction = async (order) => {
     if (!order) return;
@@ -113,7 +121,7 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
         }),
       });
 
-      await fetchKitchenOrders();
+      await fetchKitchenOrders(kitchenOutletFilter);
     } catch (error) {
       console.error("Failed to update kitchen order:", error);
 
@@ -224,8 +232,8 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
         </div>
 
         {/* TOP TAB SWITCHER: KDS ORDERS vs LIVE ASSETS */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-xs">
             <button
               type="button"
               className="flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-black text-slate-900 shadow-sm transition"
@@ -322,22 +330,76 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
 
       </div>
 
+      {/* Kitchen Station / Outlet Selector Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+        <div className="flex items-center gap-2">
+          <UtensilsCrossed className="h-5 w-5 text-slate-600" />
+          <span className="text-sm font-bold text-slate-800">Kitchen Station:</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setKitchenOutletFilter("all")}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+              kitchenOutletFilter === "all"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            All Stations ({kitchenOrders.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setKitchenOutletFilter("CAFE_KITCHEN")}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+              kitchenOutletFilter === "CAFE_KITCHEN"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+            }`}
+          >
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            Cafe Kitchen
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setKitchenOutletFilter("RESTAURANT_KITCHEN")}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+              kitchenOutletFilter === "RESTAURANT_KITCHEN"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "border border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100"
+            }`}
+          >
+            <span className="h-2 w-2 rounded-full bg-blue-400" />
+            Restaurant Kitchen
+          </button>
+        </div>
+      </div>
+
       {/* Orders */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
 
-        <div className="border-b border-gray-200 px-5 py-4">
-          <h2 className="font-semibold text-gray-900">
-            Kitchen Orders
-          </h2>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Orders sent from the POS system.
-          </p>
+        <div className="border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-900">
+              Kitchen Orders
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Orders sent from POS system stations.
+            </p>
+          </div>
+          {kitchenOutletFilter !== "all" && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              Filtering: {kitchenOutletFilter === "CAFE_KITCHEN" ? "Cafe Kitchen" : "Restaurant Kitchen"}
+            </span>
+          )}
         </div>
 
         {displayedOrders.length === 0 ? (
           <div className="flex h-48 items-center justify-center text-gray-400">
-            No {filterStatus !== "all" ? filterStatus : "kitchen"} orders at this moment.
+            No {filterStatus !== "all" ? filterStatus : "kitchen"} orders for the selected station at this moment.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -347,6 +409,7 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-5 py-4">Order</th>
+                  <th className="px-5 py-4">Station</th>
                   <th className="px-5 py-4">Table</th>
                   <th className="px-5 py-4">Type</th>
                   <th className="px-5 py-4">Items</th>
@@ -386,6 +449,27 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
                       {/* Order */}
                       <td className="px-5 py-4 font-semibold text-gray-900">
                         #{order.order_number}
+                      </td>
+
+                      {/* Station */}
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                            order.kitchen_outlet_code === "CAFE_KITCHEN" || order.outlet_code === "CAFE"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : order.kitchen_outlet_code === "RESTAURANT_KITCHEN" || order.outlet_code === "RESTAURANT_BAR"
+                              ? "bg-blue-50 text-blue-800 border-blue-200"
+                              : "bg-slate-50 text-slate-700 border-slate-200"
+                          }`}
+                        >
+                          <UtensilsCrossed className="h-3 w-3" />
+                          {order.kitchen_outlet_name ||
+                            (order.kitchen_outlet_code === "CAFE_KITCHEN"
+                              ? "Cafe Kitchen"
+                              : order.kitchen_outlet_code === "RESTAURANT_KITCHEN"
+                              ? "Restaurant Kitchen"
+                              : order.outlet_name || "General Kitchen")}
+                        </span>
                       </td>
 
                       {/* Table */}

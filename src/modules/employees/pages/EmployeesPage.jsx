@@ -20,10 +20,15 @@ import {
   Building2,
   Eye,
   EyeOff,
+  Network,
+  Store,
+  GitFork,
+  Crown,
 } from "lucide-react";
 
 import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
+import OrgChartView from "../components/OrgChartView";
 
 // =====================================================
 // CONSTANTS
@@ -32,14 +37,25 @@ import api from "../../../services/api";
 const roles = [
   { id: 1, name: "admin", label: "Admin" },
   { id: 2, name: "manager", label: "Manager" },
-  { id: 3, name: "hr", label: "HR" },
-  { id: 4, name: "finance", label: "Finance" },
-  { id: 5, name: "cashier", label: "Cashier" },
-  { id: 6, name: "waiter", label: "Waiter" },
-  { id: 7, name: "chef", label: "Chef" },
-  { id: 8, name: "bartender", label: "Bartender" },
-  { id: 9, name: "fb_controller", label: "F&B Controller / Kitchen Auditor" },
-  { id: 10, name: "receptionist", label: "Receptionist / Front Desk" },
+  { id: 3, name: "hotel_manager", label: "Hotel Manager" },
+  { id: 4, name: "accountant_manager", label: "Accountant Manager" },
+  { id: 5, name: "cooperative_manager", label: "Cooperative Manager" },
+  { id: 6, name: "kitchen_manager", label: "Kitchen Manager" },
+  { id: 7, name: "hr", label: "HR" },
+  { id: 8, name: "finance", label: "Finance" },
+  { id: 9, name: "store_manager", label: "Store Manager" },
+  { id: 10, name: "purchasing_manager", label: "Purchasing Manager" },
+  { id: 11, name: "cafe_supervisor", label: "Cafe Supervisor" },
+  { id: 12, name: "bar_restaurant_supervisor", label: "Bar & Restaurant Supervisor" },
+  { id: 13, name: "cafe_chef", label: "Cafe Chef" },
+  { id: 14, name: "barista", label: "Barista" },
+  { id: 15, name: "cafe_waiter", label: "Cafe Waiter" },
+  { id: 16, name: "cashier", label: "Cashier" },
+  { id: 17, name: "waiter", label: "Waiter" },
+  { id: 18, name: "chef", label: "Chef" },
+  { id: 19, name: "bartender", label: "Bartender" },
+  { id: 20, name: "fb_controller", label: "F&B Controller / Kitchen Auditor" },
+  { id: 21, name: "receptionist", label: "Receptionist / Front Desk" },
 ];
 
 const departments = [
@@ -52,6 +68,10 @@ const departments = [
   { id: 7, name: "Administration" },
   { id: 8, name: "Food & Beverage" },
   { id: 9, name: "Front Desk" },
+  { id: 10, name: "Cooperative Services" },
+  { id: 11, name: "Central Store" },
+  { id: 12, name: "Purchasing" },
+  { id: 13, name: "Housekeeping" },
 ];
 
 const statusStyles = {
@@ -78,6 +98,9 @@ const emptyForm = {
   phone: "",
   roleId: "",
   departmentId: "",
+  positionId: "",
+  outletId: "",
+  reportsToEmployeeId: "",
   shiftStartTime: "18:00",
   shiftEndTime: "07:00",
   hireDate: "",
@@ -184,6 +207,12 @@ function getEmployeeUsername(employee) {
 
 function EmployeesPage() {
   const [employeeList, setEmployeeList] = useState([]);
+  const [outletsList, setOutletsList] = useState([]);
+  const [positionsList, setPositionsList] = useState([]);
+  const [rolesList, setRolesList] = useState([]);
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [activeTab, setActiveTab] = useState("directory"); // "directory" | "hierarchy"
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -218,7 +247,19 @@ function EmployeesPage() {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const empRes = await api("/employees");
+
+      const [empRes, outRes, posRes, roleRes, deptRes] = await Promise.all([
+        api("/employees").catch(() => ({ employees: [] })),
+        api("/employees/outlets").catch(() => ({ outlets: [] })),
+        api("/employees/positions").catch(() => ({ positions: [] })),
+        api("/employees/roles").catch(() => ({ roles: [] })),
+        api("/employees/departments").catch(() => ({ departments: [] })),
+      ]);
+
+      if (outRes?.outlets) setOutletsList(outRes.outlets);
+      if (posRes?.positions) setPositionsList(posRes.positions);
+      if (roleRes?.roles) setRolesList(roleRes.roles);
+      if (deptRes?.departments) setDepartmentsList(deptRes.departments);
 
       const list =
         (Array.isArray(empRes) ? empRes : null) ||
@@ -266,6 +307,8 @@ function EmployeesPage() {
       const lastName = emp.last_name || emp.lastName || "";
       const fullName = emp.name || `${firstName} ${lastName}`.trim();
       const code = emp.employee_code || emp.employeeCode || emp.code || "";
+      const pos = emp.position_title || "";
+      const outlet = emp.outlet_name || emp.outlet_code || "";
       const username = getEmployeeUsername(emp);
 
       return (
@@ -273,6 +316,8 @@ function EmployeesPage() {
         lastName.toLowerCase().includes(searchLower) ||
         fullName.toLowerCase().includes(searchLower) ||
         code.toLowerCase().includes(searchLower) ||
+        pos.toLowerCase().includes(searchLower) ||
+        outlet.toLowerCase().includes(searchLower) ||
         username.toLowerCase().includes(searchLower)
       );
     });
@@ -311,13 +356,16 @@ function EmployeesPage() {
     const parsedShift = parseShiftStringToTimes(employee.shift);
     const un = getEmployeeUsername(employee);
 
+    const currentRoles = rolesList.length > 0 ? rolesList : roles;
+    const currentDepts = departmentsList.length > 0 ? departmentsList : departments;
+
     const empRoleName = String(employee.role?.name || employee.role_name || employee.role || "").toLowerCase().trim();
-    const matchedRole = roles.find((r) => r.name.toLowerCase() === empRoleName) ||
-                        roles.find((r) => String(r.id) === String(employee.role_id || employee.roleId));
+    const matchedRole = currentRoles.find((r) => r.name.toLowerCase() === empRoleName) ||
+                        currentRoles.find((r) => String(r.id) === String(employee.role_id || employee.roleId));
 
     const empDeptName = String(employee.department?.name || employee.department_name || employee.department || "").toLowerCase().trim();
-    const matchedDept = departments.find((d) => d.name.toLowerCase() === empDeptName) ||
-                        departments.find((d) => String(d.id) === String(employee.department_id || employee.departmentId));
+    const matchedDept = currentDepts.find((d) => d.name.toLowerCase() === empDeptName) ||
+                        currentDepts.find((d) => String(d.id) === String(employee.department_id || employee.departmentId));
 
     const rawHireDate = employee.hire_date || employee.hireDate || "";
     const formattedHireDate = rawHireDate ? String(rawHireDate).split("T")[0] : "";
@@ -332,6 +380,9 @@ function EmployeesPage() {
       phone: employee.phone || "",
       roleId: matchedRole ? String(matchedRole.id) : (employee.role_id || employee.roleId ? String(employee.role_id || employee.roleId) : ""),
       departmentId: matchedDept ? String(matchedDept.id) : (employee.department_id || employee.departmentId ? String(employee.department_id || employee.departmentId) : ""),
+      positionId: employee.position_id || employee.positionId ? String(employee.position_id || employee.positionId) : "",
+      outletId: employee.outlet_id || employee.outletId ? String(employee.outlet_id || employee.outletId) : "",
+      reportsToEmployeeId: employee.reports_to_employee_id || employee.reportsToEmployeeId ? String(employee.reports_to_employee_id || employee.reportsToEmployeeId) : "",
       shiftStartTime: parsedShift.startTime,
       shiftEndTime: parsedShift.endTime,
       hireDate: formattedHireDate,
@@ -348,10 +399,27 @@ function EmployeesPage() {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
 
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
+    setForm((previous) => {
+      const updated = {
+        ...previous,
+        [name]: value,
+      };
+
+      // Auto-suggest default role and department if user selects a position
+      if (name === "positionId" && value) {
+        const foundPos = positionsList.find((p) => String(p.id) === String(value));
+        if (foundPos) {
+          if (foundPos.default_role_id) {
+            updated.roleId = String(foundPos.default_role_id);
+          }
+          if (foundPos.department_id) {
+            updated.departmentId = String(foundPos.department_id);
+          }
+        }
+      }
+
+      return updated;
+    });
   };
 
   const handleSaveEmployee = async (e) => {
@@ -396,8 +464,11 @@ function EmployeesPage() {
         return;
       }
 
-      const selectedRole = roles.find((r) => String(r.id) === String(form.roleId));
-      const selectedDept = departments.find((d) => String(d.id) === String(form.departmentId));
+      const currentRoles = rolesList.length > 0 ? rolesList : roles;
+      const currentDepts = departmentsList.length > 0 ? departmentsList : departments;
+
+      const selectedRole = currentRoles.find((r) => String(r.id) === String(form.roleId));
+      const selectedDept = currentDepts.find((d) => String(d.id) === String(form.departmentId));
 
       const payload = {
         employeeCode: form.employeeCode.trim(),
@@ -426,6 +497,15 @@ function EmployeesPage() {
         department_id: Number(form.departmentId),
         department: selectedDept?.name || null,
         departmentName: selectedDept?.name || null,
+
+        positionId: form.positionId ? Number(form.positionId) : null,
+        position_id: form.positionId ? Number(form.positionId) : null,
+
+        outletId: form.outletId ? Number(form.outletId) : null,
+        outlet_id: form.outletId ? Number(form.outletId) : null,
+
+        reportsToEmployeeId: form.reportsToEmployeeId ? Number(form.reportsToEmployeeId) : null,
+        reports_to_employee_id: form.reportsToEmployeeId ? Number(form.reportsToEmployeeId) : null,
 
         shift: form.shiftStartTime && form.shiftEndTime
           ? `${formatTimeTo12Hour(form.shiftStartTime)} - ${formatTimeTo12Hour(form.shiftEndTime)}`
@@ -749,20 +829,51 @@ function EmployeesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Employees
+            Employees & Organization
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage employees, login accounts, and shifts.
+            Manage hotel staff, workstation outlets, and organizational reporting hierarchy.
           </p>
         </div>
 
-        <button
-          onClick={openCreateForm}
-          className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-        >
-          <Plus size={18} />
-          Add Employee
-        </button>
+        <div className="flex items-center gap-3">
+          {/* View Mode Switcher */}
+          <div className="flex items-center rounded-xl bg-gray-100 p-1 border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setActiveTab("directory")}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                activeTab === "directory"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <Users size={14} />
+              <span>Directory</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("hierarchy")}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                activeTab === "hierarchy"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <Network size={14} />
+              <span>Org Chart</span>
+            </button>
+          </div>
+
+          <button
+            onClick={openCreateForm}
+            className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            <Plus size={18} />
+            Add Employee
+          </button>
+        </div>
       </div>
 
       {/* ERROR */}
@@ -778,338 +889,362 @@ function EmployeesPage() {
         </div>
       )}
 
-      {/* STATISTICS */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total Employees"
-          value={totalEmployees}
-          description="Employees under management"
-          icon={Users}
+      {/* MAIN VIEW CONTENT */}
+      {activeTab === "hierarchy" ? (
+        <OrgChartView
+          onSelectEmployee={(emp) => {
+            const full = employeeList.find((e) => e.id === emp.id) || emp;
+            setSelectedEmployee(full);
+          }}
         />
-
-        <StatCard
-          title="Active Today"
-          value={activeToday}
-          description="Currently active"
-          icon={UserCheck}
-        />
-
-        <StatCard
-          title="On Leave"
-          value={onLeave}
-          description="Employees on leave"
-          icon={Clock}
-        />
-
-        <StatCard
-          title="Absent Today"
-          value={absentToday}
-          description="Not on duty"
-          icon={UserX}
-        />
-      </div>
-
-      {/* EMPLOYEE TABLE */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        {/* TABLE HEADER */}
-        <div className="flex flex-col gap-4 border-b border-gray-200 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Employee List
-            </h2>
-            <p className="text-sm text-gray-500">
-              Click an employee to view details.
-            </p>
-          </div>
-
-          {/* SEARCH */}
-          <div className="relative w-full lg:w-80">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+      ) : (
+        <>
+          {/* STATISTICS */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Total Employees"
+              value={totalEmployees}
+              description="Employees under management"
+              icon={Users}
             />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/10"
+
+            <StatCard
+              title="Active Today"
+              value={activeToday}
+              description="Currently active"
+              icon={UserCheck}
+            />
+
+            <StatCard
+              title="On Leave"
+              value={onLeave}
+              description="Employees on leave"
+              icon={Clock}
+            />
+
+            <StatCard
+              title="Absent Today"
+              value={absentToday}
+              description="Not on duty"
+              icon={UserX}
             />
           </div>
-        </div>
 
-        {/* TABLE */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-left">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
-                  Employee
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
-                  Username
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
-                  Role
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
-                  Department
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
-                  Phone
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
-                  Status
-                </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase text-gray-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+          {/* EMPLOYEE TABLE */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+            {/* TABLE HEADER */}
+            <div className="flex flex-col gap-4 border-b border-gray-200 p-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Employee List
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Click an employee to view details or assign reporting hierarchy.
+                </p>
+              </div>
 
-            <tbody className="divide-y divide-gray-100">
-              {filteredEmployees.map((employee) => {
-                const employeeName = getEmployeeName(employee);
-                const initials = employeeName
-                  .split(" ")
-                  .filter(Boolean)
-                  .map((name) => name[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase();
+              {/* SEARCH */}
+              <div className="relative w-full lg:w-80">
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search name, position, outlet..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/10"
+                />
+              </div>
+            </div>
 
-                return (
-                  <tr
-                    key={employee.id}
-                    onClick={() => setSelectedEmployee(employee)}
-                    className="cursor-pointer transition hover:bg-gray-50"
-                  >
-                    {/* EMPLOYEE */}
-                    <td className="px-5 py-4">
+            {/* TABLE */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px] text-left">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
+                      Employee
+                    </th>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
+                      Position & Role
+                    </th>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
+                      Department & Outlet
+                    </th>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
+                      Reports To
+                    </th>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-gray-500">
+                      Status & Shift
+                    </th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase text-gray-500">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-gray-100">
+                  {filteredEmployees.map((employee) => {
+                    const employeeName = getEmployeeName(employee);
+                    const initials = employeeName
+                      .split(" ")
+                      .filter(Boolean)
+                      .map((name) => name[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase();
+
+                    const positionTitle = employee.position_title || employee.positionTitle;
+                    const outletName = employee.outlet_name || employee.outletName;
+                    const reportsToName = employee.reports_to_name || employee.reportsToName;
+
+                    return (
+                      <tr
+                        key={employee.id}
+                        onClick={() => setSelectedEmployee(employee)}
+                        className="cursor-pointer transition hover:bg-gray-50"
+                      >
+                        {/* EMPLOYEE */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 font-semibold text-blue-700 border border-blue-100">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {employeeName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {employee.employee_code ||
+                                  employee.employeeCode ||
+                                  employee.code ||
+                                  `EMP-${String(employee.id).padStart(3, "0")}`}
+                                {employee.username && ` • @${employee.username}`}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* POSITION & ROLE */}
+                        <td className="px-5 py-4">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {positionTitle || "-"}
+                            </p>
+                            <span className="inline-block mt-0.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium capitalize text-blue-700">
+                              {(() => {
+                                const r =
+                                  employee.role?.name ||
+                                  employee.role_name ||
+                                  employee.roleName ||
+                                  (typeof employee.role === "string" ? employee.role : null) ||
+                                  "-";
+                                return r.toLowerCase() === "fb_controller" ? "F&B Controller" : r;
+                              })()}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* DEPARTMENT & OUTLET */}
+                        <td className="px-5 py-4">
+                          <div>
+                            <p className="text-sm text-gray-800 font-medium">
+                              {employee.department?.name ||
+                                employee.department_name ||
+                                employee.departmentName ||
+                                (typeof employee.department === "string"
+                                  ? employee.department
+                                  : null) ||
+                                "-"}
+                            </p>
+                            {outletName ? (
+                              <span className="inline-block mt-0.5 rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200">
+                                📍 {outletName}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">Hotel-wide</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* REPORTS TO */}
+                        <td className="px-5 py-4 text-sm">
+                          {reportsToName ? (
+                            <span className="font-medium text-gray-800">
+                              👤 {reportsToName}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              👑 Executive / Root
+                            </span>
+                          )}
+                        </td>
+
+                        {/* STATUS & SHIFT */}
+                        <td className="px-5 py-4">
+                          <div>
+                            <span
+                              className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                statusStyles[employee.status] ||
+                                "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {employee.status || "-"}
+                            </span>
+                            <p className="text-[11px] text-gray-500 mt-1">
+                              {employee.shift || "6:00PM - 7:00AM"}
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* ACTIONS */}
+                        <td
+                          className="px-5 py-4 text-right"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex justify-end gap-2">
+                            {/* Remove Login Account Only (preserves sales/work history) */}
+                            {employee.user_id && (
+                              <button
+                                onClick={() => handleDeleteLoginAccount(employee)}
+                                disabled={deleting}
+                                className="rounded-lg p-2 text-gray-500 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-50"
+                                title="Remove Login Account (Keeps History)"
+                              >
+                                <KeyRound size={17} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openEditForm(employee)}
+                              className="rounded-lg p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
+                              title="Edit employee"
+                            >
+                              <Pencil size={17} />
+                            </button>
+
+                            {String(employee.status).toLowerCase() === "inactive" ? (
+                              <button
+                                onClick={() => handleActivateEmployee(employee)}
+                                disabled={deleting}
+                                className="rounded-lg p-2 text-gray-500 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
+                                title="Activate employee"
+                              >
+                                <UserCheck size={17} />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteEmployee(employee)}
+                                disabled={deleting}
+                                className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                title="Deactivate employee"
+                              >
+                                <Trash2 size={17} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filteredEmployees.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan="6"
+                        className="px-5 py-12 text-center text-sm text-gray-500"
+                      >
+                        {search
+                          ? "No employees found matching your search."
+                          : "No employees have been added yet."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TODAY'S STAFF */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Today&apos;s Staff
+              </h2>
+              <p className="text-sm text-gray-500">
+                Staff members currently on active shift.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {employeeList
+                .filter(
+                  (employee) =>
+                    String(employee.status).toLowerCase() === "active"
+                )
+                .map((employee) => {
+                  const employeeName = getEmployeeName(employee);
+                  const initials = employeeName
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((name) => name[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+
+                  return (
+                    <div
+                      key={employee.id}
+                      className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 p-4"
+                    >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-gray-700">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-semibold text-blue-700">
                           {initials}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="text-sm font-medium text-gray-900">
                             {employeeName}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {employee.employee_code ||
-                              employee.employeeCode ||
-                              employee.code ||
-                              `EMP-${String(employee.id).padStart(3, "0")}`}
+                            {employee.position_title || employee.role || "-"}
                           </p>
                         </div>
                       </div>
-                    </td>
 
-                    {/* USERNAME */}
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <User size={15} className="text-gray-400" />
-                        {getEmployeeUsername(employee)}
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-gray-700">
+                          {employee.shift || "-"}
+                        </p>
+                        <p className="mt-1 text-xs text-green-600">
+                          Active
+                        </p>
                       </div>
-                    </td>
-
-                    {/* ROLE */}
-                    <td className="px-5 py-4">
-                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium capitalize text-blue-700">
-                        {(() => {
-                          const r =
-                            employee.role?.name ||
-                            employee.role_name ||
-                            employee.roleName ||
-                            (typeof employee.role === "string" ? employee.role : null) ||
-                            roles.find(
-                              (item) => item.id === Number(employee.role_id || employee.roleId)
-                            )?.name ||
-                            "-";
-                          return r.toLowerCase() === "fb_controller" ? "F&B Controller" : r;
-                        })()}
-                      </span>
-                    </td>
-
-                    {/* DEPARTMENT */}
-                    <td className="px-5 py-4 text-sm text-gray-700">
-                      {employee.department?.name ||
-                        employee.department_name ||
-                        employee.departmentName ||
-                        (typeof employee.department === "string"
-                          ? employee.department
-                          : null) ||
-                        departments.find(
-                          (d) =>
-                            d.id ===
-                            Number(
-                              employee.department_id || employee.departmentId
-                            )
-                        )?.name ||
-                        "-"}
-                    </td>
-
-                    {/* PHONE */}
-                    <td className="px-5 py-4 text-sm text-gray-600">
-                      {employee.phone || "-"}
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          statusStyles[employee.status] ||
-                          "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {employee.status || "-"}
-                      </span>
-                    </td>
-
-                    {/* ACTIONS */}
-                    <td
-                      className="px-5 py-4 text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex justify-end gap-2">
-                        {/* Remove Login Account Only (preserves sales/work history) */}
-                        {employee.user_id && (
-                          <button
-                            onClick={() => handleDeleteLoginAccount(employee)}
-                            disabled={deleting}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-50"
-                            title="Remove Login Account (Keeps History)"
-                          >
-                            <KeyRound size={17} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => openEditForm(employee)}
-                          className="rounded-lg p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
-                          title="Edit employee"
-                        >
-                          <Pencil size={17} />
-                        </button>
-
-                        {String(employee.status).toLowerCase() === "inactive" ? (
-                          <button
-                            onClick={() => handleActivateEmployee(employee)}
-                            disabled={deleting}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
-                            title="Activate employee"
-                          >
-                            <UserCheck size={17} />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleDeleteEmployee(employee)}
-                            disabled={deleting}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                            title="Deactivate employee"
-                          >
-                            <Trash2 size={17} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {filteredEmployees.length === 0 && (
-                <tr>
-                  <td
-                    colSpan="7"
-                    className="px-5 py-12 text-center text-sm text-gray-500"
-                  >
-                    {search
-                      ? "No employees found."
-                      : "No employees have been added yet."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* TODAY'S STAFF */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Today&apos;s Staff
-          </h2>
-          <p className="text-sm text-gray-500">
-            Employees currently scheduled.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {employeeList
-            .filter(
-              (employee) =>
-                String(employee.status).toLowerCase() === "active"
-            )
-            .slice(0, 6)
-            .map((employee) => {
-              const employeeName = getEmployeeName(employee);
-              const initials = employeeName
-                .split(" ")
-                .filter(Boolean)
-                .map((name) => name[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
-
-              return (
-                <div
-                  key={employee.id}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white font-semibold text-gray-700 shadow-sm">
-                      {initials}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {employeeName}
-                      </p>
-                      <p className="text-xs capitalize text-gray-500">
-                        {employee.role || "-"}
-                      </p>
-                    </div>
-                  </div>
+                  );
+                })}
 
-                  <div className="text-right">
-                    <p className="text-xs font-medium text-gray-700">
-                      {employee.shift || "-"}
-                    </p>
-                    <p className="mt-1 text-xs text-green-600">
-                      Active
-                    </p>
-                  </div>
+              {employeeList.filter(
+                (employee) =>
+                  String(employee.status).toLowerCase() === "active"
+              ).length === 0 && (
+                <div className="col-span-full py-8 text-center text-sm text-gray-400">
+                  No active employees today.
                 </div>
-              );
-            })}
-
-          {employeeList.filter(
-            (employee) =>
-              String(employee.status).toLowerCase() === "active"
-          ).length === 0 && (
-            <div className="col-span-full py-8 text-center text-sm text-gray-400">
-              No active employees today.
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
 
       {/* =================================================
           CREATE / EDIT MODAL
       ================================================= */}
       {showForm && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/50 p-3 sm:p-6 backdrop-blur-sm flex justify-center items-start sm:items-center">
+          <div className="relative w-full max-w-3xl my-4 sm:my-auto max-h-[86vh] flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             {/* HEADER */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+            <div className="shrink-0 flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
                   {editingEmployee
@@ -1137,7 +1272,7 @@ function EmployeesPage() {
             {/* FORM */}
             <form
               onSubmit={handleSaveEmployee}
-              className="max-h-[75vh] space-y-6 overflow-y-auto p-6"
+              className="flex-1 space-y-6 overflow-y-auto p-6"
             >
               {/* PERSONAL INFORMATION */}
               <div>
@@ -1153,20 +1288,12 @@ function EmployeesPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FormInput
-                    label="Employee ID"
+                    label="Employee Code"
                     name="employeeCode"
                     value={form.employeeCode}
                     onChange={handleFormChange}
-                    placeholder="EMP-001"
+                    placeholder="e.g. EMP-001"
                     required
-                  />
-
-                  <FormInput
-                    label="Phone"
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleFormChange}
-                    placeholder="09XXXXXXXX"
                   />
 
                   <FormInput
@@ -1174,7 +1301,7 @@ function EmployeesPage() {
                     name="firstName"
                     value={form.firstName}
                     onChange={handleFormChange}
-                    placeholder="First name"
+                    placeholder="e.g. Brook"
                     required
                   />
 
@@ -1183,7 +1310,7 @@ function EmployeesPage() {
                     name="lastName"
                     value={form.lastName}
                     onChange={handleFormChange}
-                    placeholder="Last name"
+                    placeholder="e.g. Hailu"
                     required
                   />
 
@@ -1193,7 +1320,15 @@ function EmployeesPage() {
                     type="email"
                     value={form.email}
                     onChange={handleFormChange}
-                    placeholder="employee@example.com"
+                    placeholder="brook@kasina.com"
+                  />
+
+                  <FormInput
+                    label="Phone"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleFormChange}
+                    placeholder="+251 91 123 4567"
                   />
 
                   <FormInput
@@ -1280,15 +1415,87 @@ function EmployeesPage() {
                     size={18}
                     className="text-blue-600"
                   />
-                  <h3 className="font-semibold text-gray-900">
-                    Job Information
-                  </h3>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      Job Information & Organizational Placement
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Assign official position, workstation outlet, and direct reporting supervisor.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* Position */}
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Role <span className="text-red-500">*</span>
+                      Position / Title
+                    </label>
+                    <select
+                      name="positionId"
+                      value={form.positionId}
+                      onChange={handleFormChange}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    >
+                      <option value="">Select official position (optional)</option>
+                      {positionsList.map((pos) => (
+                        <option key={pos.id} value={pos.id}>
+                          {pos.title} {pos.department_name ? `(${pos.department_name})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Assigned Outlet */}
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Assigned Workstation / Outlet
+                    </label>
+                    <select
+                      name="outletId"
+                      value={form.outletId}
+                      onChange={handleFormChange}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    >
+                      <option value="">General Hotel / Not Station-Specific</option>
+                      {outletsList.map((out) => (
+                        <option key={out.id} value={out.id}>
+                          {out.name} ({out.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Reports To / Supervisor */}
+                  <div className="sm:col-span-2">
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Reports To (Direct Supervisor in Hierarchy)
+                    </label>
+                    <select
+                      name="reportsToEmployeeId"
+                      value={form.reportsToEmployeeId}
+                      onChange={handleFormChange}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    >
+                      <option value="">None (Top Executive / General Management)</option>
+                      {employeeList
+                        .filter((e) => !editingEmployee || e.id !== editingEmployee.id)
+                        .map((mgr) => {
+                          const mName = getEmployeeName(mgr);
+                          const mPos = mgr.position_title || mgr.role_name || mgr.role || "";
+                          return (
+                            <option key={mgr.id} value={mgr.id}>
+                              {mName} {mPos ? `— ${mPos}` : ""}
+                            </option>
+                          );
+                        })}
+                    </select>
+                  </div>
+
+                  {/* Role */}
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      System Role <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="roleId"
@@ -1297,7 +1504,7 @@ function EmployeesPage() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                     >
                       <option value="">Select role</option>
-                      {roles.map((role) => (
+                      {(rolesList.length > 0 ? rolesList : roles).map((role) => (
                         <option key={role.id} value={role.id}>
                           {role.label || (role.name.charAt(0).toUpperCase() + role.name.slice(1))}
                         </option>
@@ -1305,6 +1512,7 @@ function EmployeesPage() {
                     </select>
                   </div>
 
+                  {/* Department */}
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Department <span className="text-red-500">*</span>
@@ -1316,7 +1524,7 @@ function EmployeesPage() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                     >
                       <option value="">Select department</option>
-                      {departments.map((department) => (
+                      {(departmentsList.length > 0 ? departmentsList : departments).map((department) => (
                         <option key={department.id} value={department.id}>
                           {department.name}
                         </option>
@@ -1325,7 +1533,7 @@ function EmployeesPage() {
                   </div>
 
                   {/* SHIFT TIME INTERVAL SELECTOR */}
-                  <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+                  <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-gray-50/60 p-4 mt-4">
                     <div className="mb-2 flex items-center justify-between">
                       <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 uppercase tracking-wider">
                         <Clock size={15} className="text-blue-600" />
@@ -1454,15 +1662,15 @@ function EmployeesPage() {
       ================================================= */}
       {selectedEmployee && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] overflow-y-auto bg-black/50 p-3 sm:p-6 backdrop-blur-sm flex justify-center items-start sm:items-center"
           onClick={closeModal}
         >
           <div
-            className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="relative w-full max-w-2xl my-4 sm:my-auto max-h-[86vh] flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* HEADER */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+            <div className="shrink-0 flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
                   Employee Details
@@ -1481,7 +1689,7 @@ function EmployeesPage() {
             </div>
 
             {/* CONTENT */}
-            <div className="max-h-[70vh] overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6">
               {/* PROFILE */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -1549,13 +1757,28 @@ function EmployeesPage() {
               {/* EMPLOYEE INFORMATION */}
               <div className="mt-6">
                 <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  Employee Information
+                  Organizational & Workstation Details
                 </h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <InfoBox
                     icon={Briefcase}
+                    label="Position / Title"
+                    value={selectedEmployee.position_title || selectedEmployee.role || "-"}
+                  />
+                  <InfoBox
+                    icon={Store}
+                    label="Assigned Outlet"
+                    value={selectedEmployee.outlet_name || "General Hotel"}
+                  />
+                  <InfoBox
+                    icon={Crown}
+                    label="Reports To (Supervisor)"
+                    value={selectedEmployee.reports_to_name || "Executive Lead / Root"}
+                  />
+                  <InfoBox
+                    icon={Building2}
                     label="Department"
-                    value={selectedEmployee.department}
+                    value={selectedEmployee.department_name || selectedEmployee.department || "-"}
                   />
                   <InfoBox
                     icon={Phone}

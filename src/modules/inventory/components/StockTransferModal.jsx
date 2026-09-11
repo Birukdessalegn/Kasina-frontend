@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ArrowRight, Package, AlertCircle, CheckCircle2, Wine, UtensilsCrossed } from 'lucide-react';
 import api from '../../../services/api';
 
@@ -106,9 +106,9 @@ export default function StockTransferModal({ isOpen, onClose, onSuccess, initial
   };
 
   return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs'>
-      <div className='w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl transition-all'>
-        <div className='flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4'>
+    <div className='fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6 backdrop-blur-xs flex justify-center items-start sm:items-center'>
+      <div className='w-full max-w-lg my-4 sm:my-auto max-h-[86vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl transition-all'>
+        <div className='shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4'>
           <div className='flex items-center gap-3'>
             <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-600'>
               <Package className='h-5 w-5' />
@@ -126,7 +126,7 @@ export default function StockTransferModal({ isOpen, onClose, onSuccess, initial
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className='p-6 space-y-5'>
+        <form onSubmit={handleSubmit} className='flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5'>
           {error && (
             <div className='flex items-center gap-2 rounded-2xl bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 border border-rose-100'>
               <AlertCircle className='h-4 w-4 shrink-0' />

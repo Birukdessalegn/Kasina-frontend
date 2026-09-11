@@ -13,9 +13,11 @@ import {
   Plus,
   Trash2,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 
 import api from "../../../services/api";
+import PurchaseRequestsManager from "../components/PurchaseRequestsManager";
 
 /* =====================================================
    PURCHASING PAGE
@@ -26,6 +28,7 @@ function PurchasingPage() {
   /* =====================================================
      STATE
   ===================================================== */
+  const [purchasingTab, setPurchasingTab] = useState("orders"); // "orders" | "requests"
 
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -753,60 +756,91 @@ function PurchasingPage() {
 
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Mode Switcher */}
+          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setPurchasingTab("orders")}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                purchasingTab === "orders"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <ShoppingCart size={14} />
+              <span>Purchase Orders</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPurchasingTab("requests")}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                purchasingTab === "requests"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FileText size={14} />
+              <span>Requisitions</span>
+            </button>
+          </div>
 
           <Link
             to="/purchasing/reports"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
           >
-            <BarChart3 className="h-4 w-4 text-emerald-400" />
-            Purchasing Reports
+            <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+            Reports
           </Link>
 
           <button
             type="button"
             onClick={loadData}
             disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
           >
-
             <RefreshCw
-              className={`h-4 w-4 ${
+              className={`h-3.5 w-3.5 ${
                 loading
                   ? "animate-spin"
                   : ""
               }`}
             />
-
             Refresh
-
           </button>
 
           <button
             type="button"
             onClick={openPurchaseModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
           >
-
-            <ShoppingCart className="h-4 w-4" />
-
+            <ShoppingCart className="h-3.5 w-3.5" />
             New Purchase Order
-
           </button>
-
         </div>
-
       </div>
 
       {/* ERROR */}
-
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* QUICK ACTIONS */}
+      {/* CONDITIONAL TAB CONTENT */}
+      {purchasingTab === "requests" ? (
+        <PurchaseRequestsManager
+          onConvertToPO={() => {
+            loadData();
+            setPurchasingTab("orders");
+          }}
+          onRequestCreated={() => {
+            loadData();
+          }}
+        />
+      ) : (
+        <>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 
@@ -1325,6 +1359,8 @@ function PurchasingPage() {
         )}
 
       </div>
+      </>
+      )}
 
 
 

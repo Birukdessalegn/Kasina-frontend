@@ -129,8 +129,8 @@ function PaymentProofModal({ order, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-slate-900 shadow-2xl border border-slate-800 text-white">
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/85 p-3 sm:p-6 backdrop-blur-md flex justify-center items-start sm:items-center animate-in fade-in duration-200">
+      <div className="relative my-4 sm:my-auto flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-slate-900 shadow-2xl border border-slate-800 text-white">
         {/* HEADER */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-900/90">
           <div className="flex items-center gap-3">
