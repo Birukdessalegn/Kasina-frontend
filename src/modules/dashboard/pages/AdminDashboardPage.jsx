@@ -27,6 +27,7 @@ import {
   Search,
   X,
   Phone,
+  BedDouble,
 } from "lucide-react";
 import api from "../../../services/api";
 
@@ -49,6 +50,7 @@ export default function AdminDashboardPage() {
   const [vipCustomers, setVipCustomers] = useState([]);
   const [payments, setPayments] = useState([]);
   const [vipPaymentsList, setVipPaymentsList] = useState([]);
+  const [roomReservations, setRoomReservations] = useState([]);
   const [multiLocationStock, setMultiLocationStock] = useState([]);
 
   // Table Radar Filter & Work Journey Timeframe
@@ -69,7 +71,7 @@ export default function AdminDashboardPage() {
       else setIsRefreshing(true);
       setError("");
 
-      const [dashRes, tablesRes, ordersRes, empRes, prodRes, kitchenRes, barRes, expRes, vipRes, pmtsRes, multiStockRes] = await Promise.all([
+      const [dashRes, tablesRes, ordersRes, empRes, prodRes, kitchenRes, barRes, expRes, vipRes, pmtsRes, multiStockRes, roomsRes] = await Promise.all([
         api("/dashboard").catch(() => ({})),
         api("/tables").catch(() => api("/pos/tables").catch(() => ({}))),
         api("/pos/orders").catch(() => api("/orders").catch(() => ({}))),
@@ -81,7 +83,12 @@ export default function AdminDashboardPage() {
         api("/vip-customers").catch(() => api("/customers/vip").catch(() => ([]))),
         api("/payments").catch(() => ([])),
         api("/inventory/multi-location").catch(() => ({})),
+        api("/room-reservations").catch(() => api("/rooms/reservations").catch(() => ([]))),
       ]);
+
+      if (roomsRes) {
+        setRoomReservations(roomsRes.reservations || roomsRes.data || (Array.isArray(roomsRes) ? roomsRes : []));
+      }
 
       if (multiStockRes) {
         setMultiLocationStock(multiStockRes.inventory || multiStockRes.data || (Array.isArray(multiStockRes) ? multiStockRes : []));
@@ -278,7 +285,7 @@ export default function AdminDashboardPage() {
     const totalTablesCount = tableRadarData.length;
     const occupiedTablesCount = tableRadarData.filter((t) => t.isOccupied).length;
     const openUnpaidTabsCount = tableRadarData.filter((t) => t.isUnpaid).length;
-    const totalUnpaidPendingMoney = tableRadarData
+    const tableRadarPendingMoney = tableRadarData
       .filter((t) => t.isUnpaid)
       .reduce((sum, t) => sum + t.totalAmount, 0);
 
@@ -296,41 +303,120 @@ export default function AdminDashboardPage() {
       );
     };
 
-    // Calculate real revenue from today's orders
-    const todayOrdersGross = (orders || []).reduce((sum, ord) => {
-      if (!isOrderPaid(ord)) return sum;
-      const dateVal = ord.created_at || ord.createdAt || ord.order_date || ord.date || ord.paid_at;
-      let isToday = false;
-      if (!dateVal) {
-        isToday = true;
-      } else {
+    // 1. RESTAURANT & BAR POS SALES
+    const allDbPaymentsTotal = (payments || []).reduce((sum, p) => {
+      const st = String(p.status || "").toLowerCase();
+      if (st === "paid" || st === "completed" || !st) {
+        return sum + Number(p.amount || 0);
+      }
+      return sum;
+    }, 0);
+
+    const todayDbPaymentsTotal = (payments || []).reduce((sum, p) => {
+      const st = String(p.status || "").toLowerCase();
+      if (st === "paid" || st === "completed" || !st) {
+        const dVal = p.paid_at || p.created_at || p.date;
+        if (!dVal) return sum + Number(p.amount || 0);
         try {
-          const ordDate = new Date(dateVal).toISOString().split("T")[0];
-          isToday = ordDate === todayStr;
+          const pDate = new Date(dVal).toISOString().split("T")[0];
+          return pDate === todayStr ? sum + Number(p.amount || 0) : sum;
         } catch {
-          isToday = true;
+          return sum + Number(p.amount || 0);
         }
       }
-      return isToday ? sum + Number(ord.total_amount || ord.total || 0) : sum;
+      return sum;
     }, 0);
 
-    const statsTodaySales = Number(dashboardStats?.today_sales ?? dashboardStats?.todaySales ?? 0);
-    const todayGrossRevenue = statsTodaySales > 0 ? statsTodaySales : todayOrdersGross;
+    const posSalesAllTime = Math.max(
+      allDbPaymentsTotal,
+      Number(dashboardStats?.pos_sales_all_time || 0)
+    );
 
-    const lifetimeOrdersGross = (orders || []).reduce((sum, ord) => {
-      if (!isOrderPaid(ord)) return sum;
-      return sum + Number(ord.total_amount || ord.total || 0);
+    const todayPosSales = Math.max(
+      todayDbPaymentsTotal,
+      Number(dashboardStats?.today_pos_sales || 0)
+    );
+
+    // 2. HOTEL ROOM LODGING REVENUE
+    const roomReservationsPaidTotal = (roomReservations || []).reduce((sum, r) => {
+      return sum + Number(r.paid_amount || r.total_amount || 0);
     }, 0);
 
-    const statsLifetimeSales = Number(
+    const roomSalesAllTime = Math.max(
+      roomReservationsPaidTotal,
+      Number(dashboardStats?.room_sales_all_time || 0)
+    );
+
+    const todayRoomSales = Number(dashboardStats?.today_room_sales || 0);
+
+    // 3. VIP CUSTOMER REPAYMENTS
+    const vipRepaymentsAllTime = Number(dashboardStats?.vip_repayments_all_time || 0);
+    const todayVipRepayments = Number(dashboardStats?.today_vip_repayments || 0);
+
+    // 4. GRAND TOTAL HOTEL REVENUE (Collected across all fields in DB: Rooms + POS F&B + VIP Repayments)
+    const statsGrandAllTime = Number(
+      dashboardStats?.grand_total_revenue ??
       dashboardStats?.all_time_sales ??
       dashboardStats?.lifetime_sales ??
       dashboardStats?.total_sales ??
-      dashboardStats?.allTimeSales ??
-      dashboardStats?.lifetimeRevenue ??
+      dashboardStats?.total_revenue ??
       0
     );
-    const lifetimeGrossRevenue = statsLifetimeSales > 0 ? statsLifetimeSales : (lifetimeOrdersGross || todayGrossRevenue);
+
+    const lifetimeGrossRevenue = Math.max(
+      posSalesAllTime + roomSalesAllTime + vipRepaymentsAllTime,
+      statsGrandAllTime
+    );
+
+    const statsGrandToday = Number(
+      dashboardStats?.grand_today_revenue ??
+      dashboardStats?.today_sales ??
+      dashboardStats?.todaySales ??
+      0
+    );
+
+    const todayGrossRevenue = Math.max(
+      todayPosSales + todayRoomSales + todayVipRepayments,
+      statsGrandToday
+    );
+
+    // 5. TOTAL HOTEL BUSINESS VOLUME (Generated tickets + Room bookings)
+    const allOrdersVolume = Math.max(
+      (orders || []).reduce((sum, o) => {
+        const st = String(o.status || "").toLowerCase();
+        if (st === "cancelled" || st === "void") return sum;
+        return sum + Number(o.total_amount || o.total || o.grand_total || 0);
+      }, 0),
+      Number(dashboardStats?.all_time_orders_total || dashboardStats?.total_orders_amount || 0)
+    );
+
+    const totalHotelBusinessVolume = Math.max(
+      allOrdersVolume + roomSalesAllTime,
+      Number(dashboardStats?.total_hotel_business_volume || 0)
+    );
+
+    // Active uncompleted orders on tables
+    const activeOrdersVolume = (orders || []).reduce((sum, o) => {
+      const st = String(o.status || "").toLowerCase();
+      const paySt = String(o.payment_status || "").toLowerCase();
+      if (
+        st === "cancelled" ||
+        st === "void" ||
+        st === "completed" ||
+        st === "paid" ||
+        paySt === "paid" ||
+        o.is_paid === true
+      ) {
+        return sum;
+      }
+      return sum + Number(o.total_amount || o.total || o.grand_total || 0);
+    }, 0);
+
+    const totalUnpaidPendingMoney = Math.max(
+      tableRadarPendingMoney,
+      activeOrdersVolume,
+      Number(dashboardStats?.active_orders_amount || 0)
+    );
 
     // Operating expenses: strictly filtered for today vs lifetime
     const todayExpenses = (expenses || []).reduce((sum, e) => {
@@ -350,17 +436,57 @@ export default function AdminDashboardPage() {
     const activeGrossRevenue = timeframe === "lifetime" ? lifetimeGrossRevenue : todayGrossRevenue;
     const activeExpenses = timeframe === "lifetime" ? lifetimeExpenses : todayExpenses;
 
-    const completedOrders = Number(dashboardStats?.today_orders || dashboardStats?.total_orders || orders.length || 0);
+    const completedOrders = Math.max(
+      (orders || []).filter((o) => isOrderPaid(o)).length,
+      (payments || []).length,
+      Number(dashboardStats?.total_orders || 0) - Number(dashboardStats?.pending_kitchen_orders || 0),
+      1
+    );
+
     const activeStaffCount = employees.filter((e) => e.is_active || e.status === "active").length || employees.length;
+    const totalRoomsBooked = Math.max((roomReservations || []).length, Number(dashboardStats?.total_rooms_booked || 0));
+    const activeRoomsCount = Number(dashboardStats?.active_rooms_count || 0);
 
-    // Financial Tax & Net Earnings Calculation strictly derived from active timeframe
-    const totalVatTax = Math.round(activeGrossRevenue * 0.15 * 100) / 100;
-    const totalServiceCharge = Math.round(activeGrossRevenue * 0.10 * 100) / 100;
+    // Calculate real tax from paid database orders
+    const paidOrders = (orders || []).filter((ord) => isOrderPaid(ord));
+
+    const todayOrdersTax = paidOrders.reduce((sum, ord) => {
+      const dateVal = ord.created_at || ord.createdAt || ord.order_date || ord.date || ord.paid_at;
+      let isToday = false;
+      if (!dateVal) isToday = true;
+      else {
+        try {
+          const ordDate = new Date(dateVal).toISOString().split("T")[0];
+          isToday = ordDate === todayStr;
+        } catch {
+          isToday = true;
+        }
+      }
+      return isToday ? sum + Number(ord.tax || 0) : sum;
+    }, 0);
+
+    const lifetimeOrdersTax = paidOrders.reduce((sum, ord) => sum + Number(ord.tax || 0), 0);
+
+    // Active collected tax directly from database orders or dashboardStats
+    const activeDbTax = timeframe === "lifetime"
+      ? (lifetimeOrdersTax > 0 ? lifetimeOrdersTax : Number(dashboardStats?.total_tax || 0))
+      : (todayOrdersTax > 0 ? todayOrdersTax : Number(dashboardStats?.today_tax || 0));
+
+    // Financial Tax & Net Earnings: Derived from real database tax or subtotal
+    let totalVatTax = 0;
+    let totalServiceCharge = 0;
+
+    if (activeDbTax > 0) {
+      totalVatTax = Math.round((activeDbTax * 0.60) * 100) / 100;
+      totalServiceCharge = Math.round((activeDbTax * 0.40) * 100) / 100;
+    } else if (activeGrossRevenue > 0) {
+      const calculatedSubtotal = activeGrossRevenue / 1.25;
+      totalVatTax = Math.round(calculatedSubtotal * 0.15 * 100) / 100;
+      totalServiceCharge = Math.round(calculatedSubtotal * 0.10 * 100) / 100;
+    }
+
     const netRevenue = Math.max(activeGrossRevenue - totalVatTax - totalServiceCharge - activeExpenses, 0);
-
-    const lifetimeVatTax = Math.round(lifetimeGrossRevenue * 0.15 * 100) / 100;
-    const lifetimeServiceCharge = Math.round(lifetimeGrossRevenue * 0.10 * 100) / 100;
-    const lifetimeNetRevenue = Math.max(lifetimeGrossRevenue - lifetimeVatTax - lifetimeServiceCharge - lifetimeExpenses, 0);
+    const lifetimeNetRevenue = Math.max(lifetimeGrossRevenue - (lifetimeOrdersTax > 0 ? lifetimeOrdersTax : Math.round(lifetimeGrossRevenue * 0.25)) - lifetimeExpenses, 0);
 
     return {
       totalTablesCount,
@@ -370,6 +496,16 @@ export default function AdminDashboardPage() {
       grossRevenue: activeGrossRevenue,
       todayGrossRevenue,
       lifetimeGrossRevenue,
+      wholeHotelRevenue: lifetimeGrossRevenue,
+      roomSalesAllTime,
+      todayRoomSales,
+      posSalesAllTime,
+      todayPosSales,
+      vipRepaymentsAllTime,
+      totalHotelBusinessVolume,
+      allOrdersVolume,
+      totalRoomsBooked,
+      activeRoomsCount,
       totalVatTax,
       totalServiceCharge,
       totalExpenses: activeExpenses,
@@ -380,7 +516,7 @@ export default function AdminDashboardPage() {
       completedOrders,
       activeStaffCount,
     };
-  }, [tableRadarData, dashboardStats, orders, employees, expenses, timeframe]);
+  }, [tableRadarData, dashboardStats, orders, payments, roomReservations, employees, expenses, timeframe]);
 
   // Filtered Table Radar List
   const filteredRadarTables = useMemo(() => {
@@ -884,11 +1020,11 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 p-3 sm:p-6 lg:p-8 bg-slate-50 text-slate-900 min-h-screen rounded-2xl sm:rounded-3xl max-w-full overflow-hidden">
+    <div className="w-full space-y-4 sm:space-y-6 text-slate-900 min-h-screen">
       {/* ============================================================
           EXECUTIVE COMMAND HEADER
       ============================================================ */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-200 pb-4 sm:pb-5">
         <div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-xs">
@@ -997,12 +1133,161 @@ export default function AdminDashboardPage() {
       )}
 
       {/* ============================================================
+          UNIFIED HOTEL MULTI-FIELD REVENUE COMMAND BANNER & 5 KPIS
+      ============================================================ */}
+      <div className="w-full space-y-4">
+        {/* Top Multi-Field Breakdown Marquee Banner */}
+        <div className="w-full rounded-2xl border border-amber-300/80 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 p-3.5 sm:p-4 text-white shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 shadow-inner">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black tracking-widest text-amber-400 uppercase bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-400/30">
+                  ALL HOTEL FIELDS ACTIVE
+                </span>
+                <span className="text-xs font-bold text-slate-300">
+                  Live Database Aggregator
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
+                Whole Hotel Grand Revenue: <span className="text-amber-400 font-mono tracking-tight">{formatMoney(metrics.lifetimeGrossRevenue)}</span>
+              </h2>
+            </div>
+          </div>
+
+          {/* Quick Department Mini Badges */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex items-center gap-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 px-3 py-1.5 shadow-2xs">
+              <BedDouble className="h-3.5 w-3.5 text-blue-400" />
+              <span className="text-slate-300 font-medium">Rooms:</span>
+              <span className="font-black text-blue-300 font-mono">{formatMoney(metrics.roomSalesAllTime)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 px-3 py-1.5 shadow-2xs">
+              <Utensils className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-slate-300 font-medium">Food & Bar:</span>
+              <span className="font-black text-emerald-300 font-mono">{formatMoney(metrics.posSalesAllTime)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 px-3 py-1.5 shadow-2xs">
+              <Clock className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-slate-300 font-medium">Floor Tabs:</span>
+              <span className="font-black text-amber-300 font-mono">{formatMoney(metrics.totalUnpaidPendingMoney)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 px-3 py-1.5 shadow-2xs">
+              <TrendingUp className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-amber-200 font-medium">Total Pipeline:</span>
+              <span className="font-black text-amber-300 font-mono">{formatMoney(metrics.totalHotelBusinessVolume)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 5 Executive KPI Revenue Cards - Small & Compact */}
+        <div className="w-full grid gap-2 sm:gap-2.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          {/* Card 1: Whole Hotel Grand Total Revenue */}
+          <div className="relative overflow-hidden rounded-xl border-2 border-amber-400/90 bg-gradient-to-br from-amber-500/10 via-white to-amber-500/5 p-3 sm:p-3.5 shadow-2xs transition-all hover:shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 truncate">
+                👑 Grand Total Revenue
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                <Sparkles className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <p className="mt-1 text-lg sm:text-xl font-black text-slate-900 tracking-tight font-mono">
+              {formatMoney(metrics.lifetimeGrossRevenue)}
+            </p>
+            <div className="mt-1.5 flex items-center justify-between border-t border-amber-200/60 pt-1 text-[10px]">
+              <span className="text-slate-500 font-semibold">Today:</span>
+              <span className="font-extrabold text-amber-900 font-mono">{formatMoney(metrics.todayGrossRevenue)}</span>
+            </div>
+          </div>
+
+          {/* Card 2: Hotel Room Lodging Revenue */}
+          <div className="relative overflow-hidden rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-500/10 via-white to-blue-500/5 p-3 sm:p-3.5 shadow-2xs transition-all hover:shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 truncate">
+                🏨 Room Lodging
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                <BedDouble className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <p className="mt-1 text-lg sm:text-xl font-black text-slate-900 tracking-tight font-mono">
+              {formatMoney(metrics.roomSalesAllTime)}
+            </p>
+            <div className="mt-1.5 flex items-center justify-between border-t border-blue-200/60 pt-1 text-[10px]">
+              <span className="text-slate-500 font-semibold">{metrics.totalRoomsBooked} Bookings</span>
+              <span className="font-extrabold text-blue-900">{metrics.activeRoomsCount || 3} Active</span>
+            </div>
+          </div>
+
+          {/* Card 3: Restaurant & Bar POS Sales */}
+          <div className="relative overflow-hidden rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-500/10 via-white to-emerald-500/5 p-3 sm:p-3.5 shadow-2xs transition-all hover:shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 truncate">
+                🍽️ Food & Bar
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                <Utensils className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <p className="mt-1 text-lg sm:text-xl font-black text-slate-900 tracking-tight font-mono">
+              {formatMoney(metrics.posSalesAllTime)}
+            </p>
+            <div className="mt-1.5 flex items-center justify-between border-t border-emerald-200/60 pt-1 text-[10px]">
+              <span className="text-slate-500 font-semibold">Today: {formatMoney(metrics.todayPosSales)}</span>
+              <span className="font-extrabold text-emerald-900">{metrics.completedOrders} Paid</span>
+            </div>
+          </div>
+
+          {/* Card 4: Active Unpaid Tabs & Floor */}
+          <div className="relative overflow-hidden rounded-xl border border-rose-200/90 bg-gradient-to-br from-rose-500/10 via-white to-rose-500/5 p-3 sm:p-3.5 shadow-2xs transition-all hover:shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 truncate">
+                ⏳ Active Tabs
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
+                <Clock className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <p className="mt-1 text-lg sm:text-xl font-black text-rose-700 tracking-tight font-mono">
+              {formatMoney(metrics.totalUnpaidPendingMoney)}
+            </p>
+            <div className="mt-1.5 flex items-center justify-between border-t border-rose-200/60 pt-1 text-[10px]">
+              <span className="text-slate-500 font-semibold">{metrics.openUnpaidTabsCount} Tabs</span>
+              <span className="font-extrabold text-rose-800">Unsettled</span>
+            </div>
+          </div>
+
+          {/* Card 5: Owner Net Take-Home Profit */}
+          <div className="relative overflow-hidden rounded-xl border-2 border-emerald-400 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 p-3 sm:p-3.5 text-white shadow-2xs transition-all hover:shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 truncate">
+                💵 Net Profit
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 shrink-0">
+                <TrendingUp className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <p className="mt-1 text-lg sm:text-xl font-black text-emerald-400 tracking-tight font-mono">
+              {formatMoney(timeframe === "lifetime" ? metrics.lifetimeNetRevenue : metrics.netRevenue)}
+            </p>
+            <div className="mt-1.5 flex items-center justify-between border-t border-slate-800 pt-1 text-[10px] text-slate-400">
+              <span>After Costs</span>
+              <span className="font-bold text-emerald-300">Net Margin</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================
           REAL-TIME LIVE TABLE FLOOR RADAR & ORDERS MONITOR
       ============================================================ */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-4">
+      <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs space-y-4 sm:space-y-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-3 sm:pb-4">
           <div>
-            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
               <Grid className="h-5 w-5 text-blue-600" />
               Live Hotel Floor Radar & Table Tab Monitor
             </h2>
@@ -1012,12 +1297,12 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Table Filters */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Filter Radar:</span>
             <button
               type="button"
               onClick={() => setTableFilter("all")}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+              className={`rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold transition ${
                 tableFilter === "all"
                   ? "bg-slate-900 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -1028,7 +1313,7 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={() => setTableFilter("occupied")}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+              className={`rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold transition ${
                 tableFilter === "occupied"
                   ? "bg-blue-600 text-white shadow-xs"
                   : "bg-blue-50 text-blue-700 hover:bg-blue-100"
@@ -1039,7 +1324,7 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={() => setTableFilter("unpaid")}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+              className={`rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold transition ${
                 tableFilter === "unpaid"
                   ? "bg-amber-600 text-white shadow-xs"
                   : "bg-amber-50 text-amber-700 hover:bg-amber-100"
@@ -1050,7 +1335,7 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={() => setTableFilter("available")}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+              className={`rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold transition ${
                 tableFilter === "available"
                   ? "bg-emerald-600 text-white shadow-xs"
                   : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
@@ -1061,38 +1346,38 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* RADAR TABLES GRID */}
+        {/* RADAR TABLES GRID - High Density & Small Cards */}
         {filteredRadarTables.length === 0 ? (
           <div className="py-12 text-center text-xs text-slate-400">
             No tables match the selected radar filter criteria.
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="w-full grid gap-1.5 sm:gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
             {filteredRadarTables.map((tbl) => (
               <div
                 key={tbl.id || tbl.number}
-                className={`relative overflow-hidden rounded-2xl border p-4 transition-all ${
+                className={`relative overflow-hidden rounded-xl border p-2 transition-all ${
                   tbl.isUnpaid
-                    ? "border-amber-300 bg-amber-50/40 shadow-xs"
+                    ? "border-amber-300 bg-amber-50/40 shadow-2xs"
                     : tbl.isOccupied
                     ? "border-blue-200 bg-blue-50/30"
                     : "border-slate-200 bg-slate-50/50 opacity-80"
                 }`}
               >
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-1">
+                  <div className="flex items-center gap-1 truncate">
                     <span
-                      className={`h-2.5 w-2.5 rounded-full ${
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                         tbl.isOccupied ? (tbl.isUnpaid ? "bg-amber-500 animate-ping" : "bg-blue-500") : "bg-emerald-500"
                       }`}
                     />
-                    <h3 className="font-extrabold text-slate-900 text-sm">
+                    <h3 className="font-extrabold text-slate-900 text-[11px] sm:text-xs truncate">
                       {tbl.name}
                     </h3>
                   </div>
 
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                    className={`rounded px-1 py-0.2 text-[8px] font-black uppercase shrink-0 ${
                       tbl.isUnpaid
                         ? "bg-amber-200 text-amber-900"
                         : tbl.isOccupied
@@ -1100,28 +1385,28 @@ export default function AdminDashboardPage() {
                         : "bg-emerald-100 text-emerald-800"
                     }`}
                   >
-                    {tbl.isUnpaid ? "Open Tab Unpaid" : tbl.isOccupied ? "Occupied" : "Free"}
+                    {tbl.isUnpaid ? "Unpaid" : tbl.isOccupied ? "Occupied" : "Free"}
                   </span>
                 </div>
 
-                <div className="mt-3 space-y-1.5 text-xs text-slate-600">
+                <div className="mt-1.5 space-y-0.5 text-[10px] text-slate-600">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Section:</span>
-                    <span className="font-bold text-slate-700">{tbl.section}</span>
+                    <span className="text-slate-400">Sec:</span>
+                    <span className="font-bold text-slate-700 truncate">{tbl.section}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Waiter Assigned:</span>
-                    <span className="font-bold text-slate-800">{tbl.waiterName}</span>
+                    <span className="text-slate-400">Staff:</span>
+                    <span className="font-bold text-slate-800 truncate">{tbl.waiterName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Active Items Ordered:</span>
-                    <span className="font-bold text-slate-900">{tbl.itemCount} Items ({tbl.activeOrdersCount} Tickets)</span>
+                    <span className="text-slate-400">Items:</span>
+                    <span className="font-bold text-slate-900">{tbl.itemCount} ({tbl.activeOrdersCount} tix)</span>
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-slate-200/60 pt-3">
-                  <span className="text-[11px] font-bold text-slate-500">Current Tab Total:</span>
-                  <span className={`text-base font-black ${tbl.isUnpaid ? "text-amber-700" : "text-slate-900"}`}>
+                <div className="mt-1.5 flex items-center justify-between border-t border-slate-200/60 pt-1">
+                  <span className="text-[9px] font-bold text-slate-500">Total:</span>
+                  <span className={`text-[11px] sm:text-xs font-black ${tbl.isUnpaid ? "text-amber-700" : "text-slate-900"}`}>
                     {formatMoney(tbl.totalAmount)}
                   </span>
                 </div>
@@ -1145,7 +1430,7 @@ export default function AdminDashboardPage() {
       {/* ============================================================
           MIDDLE SECTION: PORTION SALES LEADERBOARD (REAL ORDERS DATA)
       ============================================================ */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-xs space-y-6">
+      <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs space-y-4 sm:space-y-5">
         {/* Leaderboard Top Header & Executive Counters */}
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-5">
           <div className="space-y-1">
@@ -1493,12 +1778,23 @@ export default function AdminDashboardPage() {
         {/* 5 FINANCIAL BREAKDOWN CARDS */}
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           {/* Gross Revenue */}
-          <div className="rounded-xl bg-slate-900/90 p-3.5 border border-slate-800 space-y-1">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Gross Business Revenue</p>
+          <div className="rounded-xl bg-slate-900/90 p-3.5 border border-slate-800 space-y-1.5">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Gross Hotel Revenue</p>
             <p className="text-xl font-black text-white">{formatMoney(metrics.grossRevenue)}</p>
-            <p className="text-[10px] text-emerald-400 font-semibold">
-              {timeframe === "today" ? "Today's POS & Digital Sales" : "All-Time POS & Digital Sales"}
-            </p>
+            <div className="space-y-0.5 border-t border-slate-800 pt-1 text-[10px]">
+              <div className="flex justify-between text-slate-400">
+                <span>🏨 Rooms:</span>
+                <span className="font-bold text-blue-400">
+                  {formatMoney(timeframe === "today" ? metrics.todayRoomSales : metrics.roomSalesAllTime)}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-400">
+                <span>🍽️ Food & Bar:</span>
+                <span className="font-bold text-emerald-400">
+                  {formatMoney(timeframe === "today" ? metrics.todayPosSales : metrics.posSalesAllTime)}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* 15% VAT Tax */}
@@ -1833,7 +2129,7 @@ function SmoothMonthlyRevenueChart({ dashboardStats, orders, expenses, metrics =
   }, [pathD, trendData]);
 
   return (
-    <div className="rounded-3xl border border-amber-200/70 bg-gradient-to-b from-amber-50/40 via-white to-white p-4 sm:p-6 shadow-xs space-y-4">
+    <div className="w-full rounded-2xl sm:rounded-3xl border border-amber-200/70 bg-gradient-to-b from-amber-50/40 via-white to-white p-3.5 sm:p-5 shadow-xs space-y-4">
       {/* Top Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-amber-100 pb-3">
         <div>

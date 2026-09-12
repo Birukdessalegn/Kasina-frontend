@@ -28,12 +28,14 @@ import {
   Check,
   Loader2,
   Crown,
+  Lock,
   Image as ImageIcon
 } from "lucide-react";
 import {
   getRooms,
   getRoomTypes,
   getRoomStats,
+  getReservation,
   createReservation,
   updateReservation,
   uploadGuestIdImage,
@@ -123,6 +125,12 @@ export default function FrontDeskPage() {
   // Fullscreen ID Image Viewer Modal
   const [idViewerModalOpen, setIdViewerModalOpen] = useState(false);
   const [viewingIdImageUrl, setViewingIdImageUrl] = useState("");
+
+  // Reserved Room Details Popup Modal
+  const [reservedDetailsModalOpen, setReservedDetailsModalOpen] = useState(false);
+  const [selectedReservedRoom, setSelectedReservedRoom] = useState(null);
+  const [selectedReservationDetails, setSelectedReservationDetails] = useState(null);
+  const [loadingResDetails, setLoadingResDetails] = useState(false);
 
   const [toast, setToast] = useState(null);
 
@@ -293,6 +301,28 @@ export default function FrontDeskPage() {
       special_requests: "",
     });
     setBookingModalOpen(true);
+  };
+
+  // Open Reserved Room Details Popup Modal
+  const handleOpenReservedDetails = async (room) => {
+    setSelectedReservedRoom(room);
+    setSelectedReservationDetails(null);
+    setReservedDetailsModalOpen(true);
+    if (room.current_reservation_id) {
+      try {
+        setLoadingResDetails(true);
+        const res = await getReservation(room.current_reservation_id).catch(() => null);
+        if (res?.data || res?.reservation) {
+          setSelectedReservationDetails(res.data || res.reservation);
+        } else {
+          setSelectedReservationDetails(null);
+        }
+      } catch {
+        setSelectedReservationDetails(null);
+      } finally {
+        setLoadingResDetails(false);
+      }
+    }
   };
 
   // Open Update ID Modal
@@ -478,7 +508,7 @@ export default function FrontDeskPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-4 sm:space-y-5">
       {/* Toast Notification */}
       {toast && (
         <div
@@ -493,58 +523,58 @@ export default function FrontDeskPage() {
         </div>
       )}
 
-      {/* TOP STATS CARDS */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      {/* TOP STATS CARDS (COMPACT & SMALL) */}
+      <div className="w-full grid grid-cols-2 gap-1.5 sm:gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-2 sm:p-2.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-slate-500">Total Rooms</span>
-            <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
-              <DoorClosed size={16} />
+            <span className="text-[10px] font-bold uppercase text-slate-500">Total Rooms</span>
+            <span className="rounded-md bg-blue-50 p-1 text-blue-600">
+              <DoorClosed size={12} />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900">{stats.total || 0}</p>
+          <p className="mt-0.5 text-base sm:text-lg font-black text-slate-900">{stats.total || 0}</p>
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-2 sm:p-2.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-emerald-700">Available</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-bold uppercase text-emerald-700">Available</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           </div>
-          <p className="mt-2 text-2xl font-black text-emerald-800">{stats.available || 0}</p>
+          <p className="mt-0.5 text-base sm:text-lg font-black text-emerald-800">{stats.available || 0}</p>
         </div>
 
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 shadow-sm">
+        <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-2 sm:p-2.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-rose-700">Occupied</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+            <span className="text-[10px] font-bold uppercase text-rose-700">Occupied</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
           </div>
-          <p className="mt-2 text-2xl font-black text-rose-800">{stats.occupied || 0}</p>
+          <p className="mt-0.5 text-base sm:text-lg font-black text-rose-800">{stats.occupied || 0}</p>
         </div>
 
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 shadow-sm">
+        <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-2 sm:p-2.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-amber-700">Reserved</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+            <span className="text-[10px] font-bold uppercase text-amber-700">Reserved</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
           </div>
-          <p className="mt-2 text-2xl font-black text-amber-800">{stats.reserved || 0}</p>
+          <p className="mt-0.5 text-base sm:text-lg font-black text-amber-800">{stats.reserved || 0}</p>
         </div>
 
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 shadow-sm">
+        <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-2 sm:p-2.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-sky-700">Cleaning</span>
-            <span className="rounded-lg bg-sky-100 p-1 text-sky-600">
-              <Sparkles size={14} />
+            <span className="text-[10px] font-bold uppercase text-sky-700">Cleaning</span>
+            <span className="rounded-md bg-sky-100 p-0.5 text-sky-600">
+              <Sparkles size={11} />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-sky-800">{stats.cleaning || 0}</p>
+          <p className="mt-0.5 text-base sm:text-lg font-black text-sky-800">{stats.cleaning || 0}</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-2 sm:p-2.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-slate-500">Occupancy</span>
-            <span className="text-xs font-bold text-slate-700">{stats.occupancyRate || 0}%</span>
+            <span className="text-[10px] font-bold uppercase text-slate-500">Occupancy</span>
+            <span className="text-xs font-black text-slate-800">{stats.occupancyRate || 0}%</span>
           </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div
               className="h-full bg-blue-600 transition-all duration-500"
               style={{ width: `${Math.min(100, stats.occupancyRate || 0)}%` }}
@@ -554,16 +584,16 @@ export default function FrontDeskPage() {
       </div>
 
       {/* TOOLBAR: FILTERS + ACTIONS */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-1.5">
           {/* Status filter tabs */}
           {["all", "available", "occupied", "reserved", "cleaning", "maintenance"].map((st) => (
             <button
               key={st}
               onClick={() => setSelectedStatus(st)}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold capitalize transition ${
+              className={`rounded-lg px-3 py-1 text-xs font-bold capitalize transition ${
                 selectedStatus === st
-                  ? "bg-slate-900 text-white shadow"
+                  ? "bg-slate-900 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -572,13 +602,13 @@ export default function FrontDeskPage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Floor filter */}
           {floors.length > 0 && (
             <select
               value={selectedFloor}
               onChange={(e) => setSelectedFloor(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-500"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
             >
               <option value="all">All Floors</option>
               {floors.map((f) => (
@@ -591,116 +621,125 @@ export default function FrontDeskPage() {
 
           {/* Search input */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
             <input
               type="text"
               placeholder="Search room, guest..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs outline-none focus:border-blue-500 w-44"
+              className="rounded-lg border border-slate-200 bg-white pl-7 pr-2.5 py-1 text-xs outline-none focus:border-blue-500 w-40"
             />
           </div>
 
           {/* New Walk-in Button */}
           <button
             onClick={() => handleOpenBooking(null, "walkin")}
-            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             Walk-in Check-In
           </button>
 
           {/* New Reservation Button */}
           <button
             onClick={() => handleOpenBooking(null, "reservation")}
-            className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 transition"
+            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 transition"
           >
-            <CalendarCheck size={16} />
+            <CalendarCheck size={14} />
             New Reservation
           </button>
         </div>
       </div>
 
-      {/* ROOMS GRID */}
+      {/* ROOMS HIGH-DENSITY COMPACT GRID */}
       {loading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
         </div>
       ) : filteredRooms.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-          <DoorClosed className="mx-auto h-12 w-12 text-slate-400" />
-          <h3 className="mt-3 text-sm font-semibold text-slate-800">No rooms found</h3>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <DoorClosed className="mx-auto h-10 w-10 text-slate-400" />
+          <h3 className="mt-2 text-xs font-bold text-slate-800">No rooms found</h3>
+          <p className="mt-0.5 text-[11px] text-slate-500">
             {rooms.length === 0
               ? "You have no rooms created yet. Go to Room Management to add your hotel rooms."
               : "Try adjusting your search or filter parameters."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+        <div className="w-full grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
           {filteredRooms.map((room) => {
             const config = STATUS_CONFIG[room.status] || STATUS_CONFIG.available;
             return (
               <div
                 key={room.id}
-                className={`relative flex flex-col justify-between rounded-2xl border ${config.border} bg-white p-5 shadow-sm transition hover:shadow-md`}
+                onClick={() => {
+                  if (room.status === "reserved") {
+                    handleOpenReservedDetails(room);
+                  }
+                }}
+                className={`relative flex flex-col justify-between rounded-xl border ${config.border} bg-white p-2 sm:p-2.5 shadow-2xs transition hover:shadow-md ${
+                  room.status === "reserved" ? "cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-300/40" : ""
+                }`}
               >
                 <div>
                   {/* Top Bar: Room # & Status Badge */}
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-extrabold text-slate-900">
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-black text-slate-900 leading-tight">
                           #{room.room_number}
                         </span>
-                        <span className="text-xs text-slate-400">Floor {room.floor}</span>
+                        <span className="text-[9px] text-slate-400">Fl {room.floor}</span>
                       </div>
-                      <p className="text-xs font-medium text-slate-600">{room.type_name}</p>
+                      <p className="text-[10px] font-semibold text-slate-600 truncate mt-0.5">{room.type_name}</p>
                     </div>
 
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${config.badge}`}
+                      className={`inline-flex items-center gap-1 rounded-md border px-1 py-0.2 text-[8px] font-extrabold uppercase ${config.badge}`}
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+                      <span className={`h-1 w-1 rounded-full ${config.dot}`} />
                       {config.label}
                     </span>
                   </div>
 
                   {/* Rate */}
-                  <div className="mt-3 text-xs text-slate-500">
-                    Rate: <span className="font-semibold text-slate-800">${Number(room.base_rate).toFixed(2)}</span> / night
+                  <div className="mt-1 text-[9px] text-slate-500 truncate">
+                    Rate: <strong className="font-mono font-bold text-slate-800">{Number(room.base_rate).toLocaleString()} ETB</strong>
                   </div>
 
-                  {/* Occupied / Reserved Guest info */}
+                  {/* Occupied Guest info (Compact) */}
                   {room.status === "occupied" && (
-                    <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50/50 p-3 text-xs">
-                      <div className="flex items-center justify-between gap-1.5 font-bold text-slate-800">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <User size={14} className="text-rose-600 shrink-0" />
-                          <span className="truncate">{room.guest_name}</span>
+                    <div className="mt-1.5 rounded-lg border border-rose-100 bg-rose-50/50 p-1.5 text-[10px] space-y-0.5">
+                      <div className="flex items-center justify-between gap-1 font-bold text-slate-800">
+                        <div className="flex items-center gap-1 truncate">
+                          <User size={11} className="text-rose-600 shrink-0" />
+                          <span className="truncate text-[10px] text-slate-900">{room.guest_name}</span>
                         </div>
                         {room.vip_tier && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-extrabold text-purple-900 border border-purple-200">
+                          <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-purple-100 px-1 py-0.2 text-[7px] font-black text-purple-900 border border-purple-200">
                             👑 {room.vip_tier}
                           </span>
                         )}
                       </div>
+
                       {room.guest_phone && (
-                        <div className="mt-1 flex items-center gap-1.5 text-slate-500">
-                          <Phone size={12} />
-                          <span>{room.guest_phone}</span>
+                        <div className="flex items-center gap-1 text-[9px] text-slate-500 truncate">
+                          <Phone size={9} className="shrink-0" />
+                          <span className="truncate">{room.guest_phone}</span>
                         </div>
                       )}
-                      <div className="mt-2 flex items-center justify-between border-t border-rose-100/60 pt-2 text-[11px] text-slate-600">
-                        <span>Check-out:</span>
+
+                      <div className="flex items-center justify-between border-t border-rose-100/60 pt-0.5 text-[9px] text-slate-600">
+                        <span>Out:</span>
                         <span className="font-semibold text-slate-800">
                           {room.check_out_date?.split("T")[0]}
                         </span>
                       </div>
 
-                      {/* Guest ID Status Badge */}
-                      <div className="mt-2 flex items-center justify-between border-t border-rose-100/60 pt-2 text-[11px]">
-                        <span className="text-slate-500 font-medium">Guest ID:</span>
+                      {/* Guest ID Status */}
+                      <div className="flex items-center justify-between border-t border-rose-100/60 pt-0.5 text-[9px]">
+                        <span className="text-slate-500 font-medium">ID:</span>
                         {room.id_image_url ? (
                           <button
                             type="button"
@@ -708,10 +747,10 @@ export default function FrontDeskPage() {
                               e.stopPropagation();
                               handleViewIdImage(room.id_image_url);
                             }}
-                            className="inline-flex items-center gap-1 rounded-md bg-emerald-100/80 px-2 py-0.5 font-bold text-emerald-800 hover:bg-emerald-200 transition"
-                            title="Click to view ID card"
+                            className="inline-flex items-center gap-0.5 rounded bg-emerald-100/90 px-1 py-0.2 text-[8px] font-bold text-emerald-800 hover:bg-emerald-200 transition"
+                            title="Click to view ID"
                           >
-                            <Eye size={11} /> 🪪 ID Attached
+                            <Eye size={9} /> ID Attached
                           </button>
                         ) : (
                           <button
@@ -720,32 +759,46 @@ export default function FrontDeskPage() {
                               e.stopPropagation();
                               handleOpenUpdateIdModal(room);
                             }}
-                            className="inline-flex items-center gap-1 rounded-md bg-amber-100/90 px-2 py-0.5 font-bold text-amber-800 hover:bg-amber-200 transition"
-                            title="Snap or upload guest ID"
+                            className="inline-flex items-center gap-0.5 rounded bg-amber-100/90 px-1 py-0.2 text-[8px] font-bold text-amber-800 hover:bg-amber-200 transition"
+                            title="Upload ID"
                           >
-                            <Camera size={11} /> ⚠️ Upload ID
+                            <Camera size={9} /> + ID
                           </button>
                         )}
                       </div>
                     </div>
                   )}
 
+                  {/* Reserved Guest info (Compact) */}
                   {room.status === "reserved" && (
-                    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                        <CalendarCheck size={14} className="text-amber-600" />
-                        <span className="truncate">{room.guest_name}</span>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenReservedDetails(room);
+                      }}
+                      className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50/70 p-1.5 text-[10px] space-y-0.5 cursor-pointer hover:border-amber-400 hover:shadow-2xs transition"
+                      title="Click to view reservation details"
+                    >
+                      <div className="flex items-center justify-between gap-1 font-bold text-slate-800">
+                        <div className="flex items-center gap-1 truncate">
+                          <CalendarCheck size={11} className="text-amber-600 shrink-0" />
+                          <span className="truncate text-[10px] text-slate-900">{room.guest_name || "Reserved Guest"}</span>
+                        </div>
+                        <span className="inline-flex items-center gap-0.5 rounded bg-amber-200/90 px-1 py-0.2 text-[7px] font-black text-amber-950 border border-amber-300 shrink-0">
+                          <Eye size={8} /> Details
+                        </span>
                       </div>
-                      <div className="mt-2 flex items-center justify-between border-t border-amber-100/60 pt-2 text-[11px] text-slate-600">
-                        <span>Check-in date:</span>
+
+                      <div className="flex items-center justify-between border-t border-amber-200/60 pt-0.5 text-[9px] text-slate-600">
+                        <span>Check-In:</span>
                         <span className="font-semibold text-slate-800">
                           {room.check_in_date?.split("T")[0]}
                         </span>
                       </div>
 
-                      {/* Guest ID Status Badge */}
-                      <div className="mt-2 flex items-center justify-between border-t border-amber-100/60 pt-2 text-[11px]">
-                        <span className="text-slate-500 font-medium">Guest ID:</span>
+                      {/* Guest ID Status */}
+                      <div className="flex items-center justify-between border-t border-amber-200/60 pt-0.5 text-[9px]">
+                        <span className="text-slate-500 font-medium">ID:</span>
                         {room.id_image_url ? (
                           <button
                             type="button"
@@ -753,10 +806,10 @@ export default function FrontDeskPage() {
                               e.stopPropagation();
                               handleViewIdImage(room.id_image_url);
                             }}
-                            className="inline-flex items-center gap-1 rounded-md bg-emerald-100/80 px-2 py-0.5 font-bold text-emerald-800 hover:bg-emerald-200 transition"
-                            title="Click to view ID card"
+                            className="inline-flex items-center gap-0.5 rounded bg-emerald-100/90 px-1 py-0.2 text-[8px] font-bold text-emerald-800 hover:bg-emerald-200 transition"
+                            title="Click to view ID"
                           >
-                            <Eye size={11} /> 🪪 ID Attached
+                            <Eye size={9} /> ID Attached
                           </button>
                         ) : (
                           <button
@@ -765,44 +818,46 @@ export default function FrontDeskPage() {
                               e.stopPropagation();
                               handleOpenUpdateIdModal(room);
                             }}
-                            className="inline-flex items-center gap-1 rounded-md bg-amber-100/90 px-2 py-0.5 font-bold text-amber-800 hover:bg-amber-200 transition"
-                            title="Snap or upload guest ID"
+                            className="inline-flex items-center gap-0.5 rounded bg-amber-100/90 px-1 py-0.2 text-[8px] font-bold text-amber-800 hover:bg-amber-200 transition"
+                            title="Upload ID"
                           >
-                            <Camera size={11} /> ⚠️ Upload ID
+                            <Camera size={9} /> + ID
                           </button>
                         )}
                       </div>
                     </div>
                   )}
 
+                  {/* Cleaning Banner (Compact) */}
                   {room.status === "cleaning" && (
-                    <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-3 text-xs flex items-center gap-2 text-sky-800">
-                      <Sparkles size={16} />
-                      <span>Housekeeping in progress</span>
+                    <div className="mt-1.5 rounded-lg border border-sky-100 bg-sky-50/50 p-1.5 text-[9px] flex items-center gap-1 text-sky-800">
+                      <Sparkles size={10} className="shrink-0" />
+                      <span className="truncate">Housekeeping</span>
                     </div>
                   )}
 
+                  {/* Maintenance Banner (Compact) */}
                   {room.status === "maintenance" && (
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs flex items-center gap-2 text-slate-600">
-                      <Wrench size={16} />
-                      <span>Out of order / Under repair</span>
+                    <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-[9px] flex items-center gap-1 text-slate-600">
+                      <Wrench size={10} className="shrink-0" />
+                      <span className="truncate">Maintenance</span>
                     </div>
                   )}
                 </div>
 
-                {/* Card Footer Actions */}
-                <div className="mt-5 border-t border-slate-100 pt-3">
+                {/* Card Footer Actions (Compact) */}
+                <div className="mt-2 border-t border-slate-100 pt-1.5">
                   {room.status === "available" && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1">
                       <button
                         onClick={() => handleOpenBooking(room, "walkin")}
-                        className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition text-center"
+                        className="rounded-md bg-blue-600 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white hover:bg-blue-700 transition text-center"
                       >
                         Walk-In
                       </button>
                       <button
                         onClick={() => handleOpenBooking(room, "reservation")}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition text-center"
+                        className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition text-center"
                       >
                         Reserve
                       </button>
@@ -810,36 +865,53 @@ export default function FrontDeskPage() {
                   )}
 
                   {room.status === "occupied" && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <button
                         onClick={() => handleOpenUpdateIdModal(room)}
-                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1 shadow-sm"
-                        title="Update guest details or snap ID with phone"
+                        className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-0.5 shadow-2xs"
+                        title="Update ID / Guest details"
                       >
-                        <Camera size={13} className="text-blue-600" />
-                        ID / Edit
+                        <Camera size={10} className="text-blue-600" />
+                        ID
                       </button>
                       <button
                         onClick={() => handleOpenCheckout(room)}
-                        className="flex-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
+                        className="flex-1 rounded-md bg-rose-600 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white hover:bg-rose-700 transition"
                       >
-                        Check-Out & Pay
+                        Check-Out
                       </button>
                     </div>
                   )}
 
                   {room.status === "reserved" && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <button
-                        onClick={() => handleOpenUpdateIdModal(room)}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1 shadow-sm"
-                        title="Update guest details or upload ID photo"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenReservedDetails(room);
+                        }}
+                        className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 hover:bg-amber-100 transition flex items-center justify-center gap-0.5 shadow-2xs"
+                        title="View who reserved this room"
                       >
-                        <Camera size={13} className="text-blue-600" />
-                        ID
+                        <Eye size={10} className="text-amber-700" />
+                        Details
                       </button>
                       <button
-                        onClick={async () => {
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenUpdateIdModal(room);
+                        }}
+                        className="rounded-md border border-slate-200 bg-white px-1 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center shadow-2xs"
+                        title="Update ID"
+                      >
+                        <Camera size={10} className="text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           try {
                             await checkInReservation(room.current_reservation_id);
                             showToast(`Room ${room.room_number} checked in!`);
@@ -848,9 +920,9 @@ export default function FrontDeskPage() {
                             showToast(err.message, "error");
                           }
                         }}
-                        className="flex-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 transition"
+                        className="flex-1 rounded-lg bg-amber-500 px-2 py-1 text-xs font-extrabold text-slate-950 hover:bg-amber-400 transition"
                       >
-                        Confirm Check-In
+                        Check-In
                       </button>
                     </div>
                   )}
@@ -858,19 +930,19 @@ export default function FrontDeskPage() {
                   {room.status === "cleaning" && (
                     <button
                       onClick={() => handleStatusChange(room.id, "available")}
-                      className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+                      className="w-full flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
                     >
-                      <CheckCircle2 size={14} />
-                      Ready / Mark Available
+                      <CheckCircle2 size={12} />
+                      Mark Ready
                     </button>
                   )}
 
                   {room.status === "maintenance" && (
                     <button
                       onClick={() => handleStatusChange(room.id, "available")}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                      className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
                     >
-                      Restore to Available
+                      Restore to Ready
                     </button>
                   )}
                 </div>
@@ -1222,24 +1294,34 @@ export default function FrontDeskPage() {
                         .filter((r) => r.status === "available" || (selectedRoom && r.id === selectedRoom.id))
                         .map((r) => (
                           <option key={r.id} value={r.id}>
-                            Room #{r.room_number} - {r.type_name} (${Number(r.base_rate).toFixed(2)}/nt)
+                            Room #{r.room_number} - {r.type_name} ({Number(r.base_rate).toLocaleString()} ETB/nt)
                           </option>
                         ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Rate Per Night ($) *
+                    <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+                      <span>Room Rate Per Night (ETB) *</span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        <Lock size={10} className="text-slate-500" /> Official Rate (Locked)
+                      </span>
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={bookingForm.rate_per_night}
-                      onChange={(e) => setBookingForm({ ...bookingForm, rate_per_night: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        readOnly
+                        value={bookingForm.rate_per_night}
+                        placeholder="0.00"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-100/90 px-3.5 py-2.5 text-sm font-bold font-mono text-slate-700 outline-none cursor-not-allowed select-none shadow-inner"
+                        title="Room rate is fixed based on hotel room catalog and cannot be manually edited."
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <Lock size={14} />
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -1300,7 +1382,7 @@ export default function FrontDeskPage() {
                     Stay Duration: <strong className="text-slate-900">{calculatedNights} Night(s)</strong>
                   </span>
                   <span className="text-slate-600">
-                    Total Accommodation: <strong className="text-blue-600 font-bold">${calculatedTotal.toFixed(2)}</strong>
+                    Total Accommodation: <strong className="text-blue-600 font-bold">{Number(calculatedTotal || 0).toLocaleString()} ETB</strong>
                   </span>
                 </div>
 
@@ -1757,6 +1839,277 @@ export default function FrontDeskPage() {
                 alt="Full ID Document"
                 className="max-h-[75vh] w-auto max-w-full rounded-xl object-contain shadow-lg"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================
+          MODAL: RESERVATION DETAILS POPUP
+      ==================================================== */}
+      {reservedDetailsModalOpen && selectedReservedRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 p-6 bg-gradient-to-r from-amber-50/90 via-white to-amber-50/40">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-slate-950 font-black text-lg shadow-md shadow-amber-500/20">
+                  #{selectedReservedRoom.room_number}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-slate-900">
+                      Room #{selectedReservedRoom.room_number} — Reservation
+                    </h3>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 border border-amber-300">
+                      Reserved
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Floor {selectedReservedRoom.floor} • {selectedReservedRoom.type_name} • {Number(selectedReservedRoom.base_rate).toLocaleString()} ETB/night
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setReservedDetailsModalOpen(false);
+                  setSelectedReservedRoom(null);
+                  setSelectedReservationDetails(null);
+                }}
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {loadingResDetails && (
+                <div className="flex items-center justify-center py-3 text-xs font-semibold text-amber-800 bg-amber-50 rounded-xl border border-amber-200">
+                  <Loader2 size={15} className="animate-spin mr-2" />
+                  Loading reservation details...
+                </div>
+              )}
+
+              {/* Guest Identity Card */}
+              {(() => {
+                const resData = selectedReservationDetails || {};
+                const guestName = resData.guest_name || selectedReservedRoom.guest_name || "Reserved Guest";
+                const guestPhone = resData.guest_phone || selectedReservedRoom.guest_phone || "Not provided";
+                const guestEmail = resData.guest_email || "Not provided";
+                const guestIdNo = resData.guest_id_number || selectedReservedRoom.guest_id_number || "Not on file";
+                const idImg = resData.id_image_url || selectedReservedRoom.id_image_url;
+                const vipTier = resData.vip_tier || selectedReservedRoom.vip_tier;
+                const resCode = resData.reservation_code || selectedReservedRoom.reservation_code || `#RES-${resData.id || selectedReservedRoom.current_reservation_id}`;
+                const checkInDate = resData.check_in_date || selectedReservedRoom.check_in_date;
+                const checkOutDate = resData.check_out_date || selectedReservedRoom.check_out_date;
+                const totalAmt = Number(resData.total_amount || selectedReservedRoom.total_amount || 0);
+                const paidAmt = Number(resData.paid_amount || selectedReservedRoom.paid_amount || 0);
+                const balance = Math.max(0, totalAmt - paidAmt);
+                const payStatus = String(resData.payment_status || selectedReservedRoom.payment_status || "pending").toLowerCase();
+                const specialNotes = resData.special_requests || selectedReservedRoom.special_requests;
+
+                return (
+                  <>
+                    {/* Primary Guest Card */}
+                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white font-black text-base shadow">
+                            <User size={22} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-extrabold text-slate-900 text-base">{guestName}</h4>
+                              {vipTier && (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-900 border border-purple-300">
+                                  👑 {vipTier}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                              <span>Phone: <strong className="text-slate-700">{guestPhone}</strong></span>
+                              {guestEmail !== "Not provided" && (
+                                <span>• Email: <strong className="text-slate-700">{guestEmail}</strong></span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
+                            Booking Code
+                          </span>
+                          <span className="font-mono font-extrabold text-slate-900 text-xs bg-white px-2 py-1 rounded-md border border-slate-200">
+                            {resCode}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ID / Passport Document Snapshot */}
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <FileText size={14} className="text-slate-400" />
+                          <span>ID / Passport: <strong className="text-slate-800">{guestIdNo}</strong></span>
+                        </div>
+
+                        {idImg ? (
+                          <button
+                            type="button"
+                            onClick={() => handleViewIdImage(idImg)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs"
+                          >
+                            <Eye size={12} />
+                            View Attached ID
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReservedDetailsModalOpen(false);
+                              handleOpenUpdateIdModal(selectedReservedRoom);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
+                          >
+                            <Camera size={12} />
+                            Upload ID Photo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stay & Schedule Details */}
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Stay Schedule
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 text-xs">
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Check-In Date</span>
+                          <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">
+                            {checkInDate ? String(checkInDate).split("T")[0] : "—"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Check-Out Date</span>
+                          <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">
+                            {checkOutDate ? String(checkOutDate).split("T")[0] : "—"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 col-span-2 sm:col-span-1">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Stay Length</span>
+                          <span className="font-extrabold text-blue-600 text-sm mt-0.5 block">
+                            {resData.total_nights || resData.nights || 1} Night(s)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Financial Breakdown */}
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Payment & Billing Ledger
+                      </h4>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Nightly Room Rate:</span>
+                          <span className="font-bold text-slate-800 font-mono">
+                            {Number(selectedReservedRoom.base_rate).toLocaleString()} ETB / night
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Total Accommodation Charge:</span>
+                          <span className="font-black text-slate-900 font-mono text-sm">
+                            {totalAmt.toLocaleString()} ETB
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-emerald-700 pt-2 border-t border-slate-100">
+                          <span className="font-semibold">Paid / Deposit Collected:</span>
+                          <span className="font-bold font-mono">
+                            {paidAmt.toLocaleString()} ETB
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-900 pt-1">
+                          <span className="font-semibold">Balance Due on Check-In:</span>
+                          <span className={`font-black font-mono text-sm ${balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                            {balance.toLocaleString()} ETB
+                          </span>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Settlement Status:</span>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${
+                            payStatus === "paid"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : payStatus === "partial"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-amber-50 text-amber-800 border-amber-200"
+                          }`}>
+                            {payStatus}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Special Requests */}
+                    {specialNotes && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-950">
+                        <span className="font-bold block text-[11px] text-amber-800 mb-0.5">Special Requests & Guest Notes:</span>
+                        {specialNotes}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-between border-t border-slate-100 p-6 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={() => {
+                  setReservedDetailsModalOpen(false);
+                  handleOpenUpdateIdModal(selectedReservedRoom);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+              >
+                <Camera size={14} className="text-blue-600" />
+                Update ID / Guest Info
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReservedDetailsModalOpen(false);
+                    setSelectedReservedRoom(null);
+                    setSelectedReservationDetails(null);
+                  }}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-white transition"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await checkInReservation(selectedReservedRoom.current_reservation_id);
+                      showToast(`Room ${selectedReservedRoom.room_number} confirmed & checked in!`);
+                      setReservedDetailsModalOpen(false);
+                      loadData();
+                    } catch (err) {
+                      showToast(err.message, "error");
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-extrabold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 transition"
+                >
+                  <CheckCircle2 size={15} />
+                  Confirm Check-In Now
+                </button>
+              </div>
             </div>
           </div>
         </div>

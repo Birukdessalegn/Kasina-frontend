@@ -538,9 +538,9 @@ function ActiveOrders() {
         currentOrders.map((order) =>
           order.id === barOrder.id
             ? {
-                ...order,
-                status: "served",
-              }
+              ...order,
+              status: "served",
+            }
             : order
         )
       );
@@ -552,7 +552,7 @@ function ActiveOrders() {
 
       alert(
         error.message ||
-          "Failed to mark drinks as served"
+        "Failed to mark drinks as served"
       );
     }
   };
@@ -712,10 +712,10 @@ function ActiveOrders() {
                 );
               }
             ) && (
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                Items Ready
-              </span>
-            )}
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                  Items Ready
+                </span>
+              )}
 
           </div>
 
@@ -933,34 +933,31 @@ function ActiveOrders() {
                                 return (
                                   <div
                                     key={`item-${rowKey}-${item.id || idx}`}
-                                    className={`inline-flex items-center gap-1.5 rounded-lg border ${
-                                      isDrink
+                                    className={`inline-flex items-center gap-1.5 rounded-lg border ${isDrink
                                         ? "border-purple-200/80 bg-purple-50 text-purple-900"
                                         : isFood
-                                        ? "border-amber-200/80 bg-amber-50 text-amber-900"
-                                        : "border-sky-200/80 bg-sky-50 text-sky-900"
-                                    } px-2.5 py-1 text-xs font-semibold shadow-xs`}
+                                          ? "border-amber-200/80 bg-amber-50 text-amber-900"
+                                          : "border-sky-200/80 bg-sky-50 text-sky-900"
+                                      } px-2.5 py-1 text-xs font-semibold shadow-xs`}
                                   >
                                     <span
-                                      className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                                        isDrink
+                                      className={`h-1.5 w-1.5 rounded-full shrink-0 ${isDrink
                                           ? "bg-purple-500"
                                           : isFood
-                                          ? "bg-amber-500"
-                                          : "bg-sky-500"
-                                      }`}
+                                            ? "bg-amber-500"
+                                            : "bg-sky-500"
+                                        }`}
                                     />
                                     <span className="font-semibold text-slate-800">
                                       {name}
                                     </span>
                                     <span
-                                      className={`rounded ${
-                                        isDrink
+                                      className={`rounded ${isDrink
                                           ? "bg-purple-600 text-white"
                                           : isFood
-                                          ? "bg-amber-600 text-white"
-                                          : "bg-sky-600 text-white"
-                                      } px-1.5 py-0.2 text-[10px] font-black`}
+                                            ? "bg-amber-600 text-white"
+                                            : "bg-sky-600 text-white"
+                                        } px-1.5 py-0.2 text-[10px] font-black`}
                                     >
                                       ×{qty}
                                     </span>
@@ -995,10 +992,10 @@ function ActiveOrders() {
                       <td className="px-3 py-3 sm:px-5 sm:py-3 text-right whitespace-nowrap">
 
                         {paidOrderIds.has(String(order.id)) ||
-                        paidOrderIds.has(String(order.order_id)) ||
-                        paidOrderIds.has(String(order.uniqueKey)) ||
-                        order.payment_status === "paid" ||
-                        order.status === "completed" ? (
+                          paidOrderIds.has(String(order.order_id)) ||
+                          paidOrderIds.has(String(order.uniqueKey)) ||
+                          order.payment_status === "paid" ||
+                          order.status === "completed" ? (
                           <div className="flex flex-col items-end justify-center gap-1.5">
                             <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-black text-white shadow-md whitespace-nowrap">
                               ✓ Paid
@@ -1037,21 +1034,21 @@ function ActiveOrders() {
                             )}
 
                             {/* PROOF IMAGE BUTTON IF AVAILABLE */}
-                             {(order.receipt_image ||
-                               order.receiptImage ||
-                               order.proof_image ||
-                               order.proofImage ||
-                               order.image_url ||
-                               order.imageUrl ||
-                               (Array.isArray(order.payments) && order.payments.some((p) => p.receipt_image || p.receiptImage || p.image_url || p.imageUrl || p.image))) && (
-                               <button
-                                 type="button"
-                                 onClick={() => setSelectedProofOrder(order)}
-                                 className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 px-2.5 py-1.5 rounded-xl transition shadow-2xs whitespace-nowrap"
-                               >
-                                 <Eye size={13} /> Proof Image
-                               </button>
-                             )}
+                            {(order.receipt_image ||
+                              order.receiptImage ||
+                              order.proof_image ||
+                              order.proofImage ||
+                              order.image_url ||
+                              order.imageUrl ||
+                              (Array.isArray(order.payments) && order.payments.some((p) => p.receipt_image || p.receiptImage || p.image_url || p.imageUrl || p.image))) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedProofOrder(order)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 px-2.5 py-1.5 rounded-xl transition shadow-2xs whitespace-nowrap"
+                                >
+                                  <Eye size={13} /> Proof Image
+                                </button>
+                              )}
 
                             {/* EDIT / ADD ITEMS BUTTON */}
                             <button
@@ -1145,4 +1142,4 @@ function ActiveOrders() {
   );
 }
 
-export default ActiveOrders;
+export default ActiveOrders;

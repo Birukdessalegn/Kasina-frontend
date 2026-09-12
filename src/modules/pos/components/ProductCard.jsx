@@ -28,19 +28,19 @@ function ProductCard({ product, onAdd, quantityInOrder = 0 }) {
   return (
     <button
       onClick={() => onAdd && onAdd(product)}
-      className={`group relative rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative rounded-xl border p-2 sm:p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
         isSelected
           ? "border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/20"
           : "border-gray-200 bg-white hover:border-blue-400"
       }`}
     >
       {quantityInOrder > 0 && (
-        <span className="absolute top-2 right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-sm">
+        <span className="absolute top-1.5 right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-black text-white shadow-sm">
           {quantityInOrder}
         </span>
       )}
 
-      <div className="flex h-28 items-center justify-center overflow-hidden rounded-lg bg-gray-100 text-4xl">
+      <div className="flex h-16 sm:h-20 items-center justify-center overflow-hidden rounded-lg bg-gray-100 text-2xl">
         {isImageSrc ? (
           <img
             src={getFullSrc(rawImage)}
@@ -52,16 +52,16 @@ function ProductCard({ product, onAdd, quantityInOrder = 0 }) {
         )}
       </div>
 
-      <div className="mt-3">
-        <h3 className="font-semibold text-gray-900">
+      <div className="mt-1.5">
+        <h3 className="text-xs font-bold text-gray-900 leading-tight line-clamp-1">
           {product.name}
         </h3>
 
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-0.5 text-[10px] text-gray-400 truncate">
           {product.category}
         </p>
 
-        <p className="mt-2 font-bold text-blue-600">
+        <p className="mt-1 text-xs font-black text-blue-600">
           {product.price.toLocaleString()} ETB
         </p>
       </div>

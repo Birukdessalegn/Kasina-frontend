@@ -7,6 +7,8 @@ import api from "../../../services/api";
 export const isBarSeatTable = (table) => {
   if (!table) return false;
   return (
+    Number(table.outlet_id) === 3 ||
+    String(table.outlet_code || "").toUpperCase() === "BAR" ||
     table.is_bar_seat === true ||
     table.is_bar_seat === 1 ||
     table.is_bar_seat === "true" ||
@@ -284,11 +286,12 @@ function TableSelector({
         </div>
       </div>
 
-      {/* Grid of Tables & Bar Stools */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {/* Grid of Tables & Bar Stools - Compact & High-Density */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:gap-2.5">
         {filteredTables.map((table) => {
           const isSelected = selectedTable?.id === table.id;
           const isBar = isBarSeatTable(table);
+          const isCafe = isCafeTable(table);
 
           const activeOrderForTable = activeOrders.find((o) => {
             const isUnpaid =
@@ -360,33 +363,37 @@ function TableSelector({
               disabled={!canSelectTable}
               onClick={() => canSelectTable && onSelectTable(table)}
               className={`
-                relative rounded-xl border p-3.5 text-left transition
+                relative rounded-xl border p-2.5 text-left transition shadow-2xs
                 ${
                   isSelected
                     ? isBar
-                      ? "border-amber-500 bg-amber-50/90 ring-2 ring-amber-500/30 shadow-md"
-                      : "border-blue-600 bg-blue-50/90 ring-2 ring-blue-600/30 shadow-md"
+                      ? "border-amber-500 bg-amber-50/90 ring-2 ring-amber-500/30 shadow-sm"
+                      : isCafe
+                      ? "border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/30 shadow-sm"
+                      : "border-blue-600 bg-blue-50/90 ring-2 ring-blue-600/30 shadow-sm"
                     : canSelectTable && isAvailable
                     ? isBar
-                      ? "border-amber-200/90 bg-linear-to-b from-amber-50/30 to-white hover:border-amber-400 hover:bg-amber-50/50 shadow-xs"
-                      : "border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50 shadow-xs"
+                      ? "border-amber-200/90 bg-linear-to-b from-amber-50/30 to-white hover:border-amber-400 hover:bg-amber-50/50"
+                      : isCafe
+                      ? "border-emerald-200/90 bg-linear-to-b from-emerald-50/30 to-white hover:border-emerald-400 hover:bg-emerald-50/50"
+                      : "border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50"
                     : canSelectTable && !isAvailable
-                    ? "border-amber-300 bg-amber-50/60 hover:border-amber-400 shadow-xs"
+                    ? "border-amber-300 bg-amber-50/60 hover:border-amber-400"
                     : "cursor-not-allowed border-rose-200/80 bg-slate-100/70 opacity-65 border-dashed"
                 }
               `}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-base">{isBar ? "🍸" : "🍽️"}</span>
-                  <span className="text-sm font-black text-slate-900 truncate">
-                    {table.table_number || table.tableNumber || `Table #${table.id}`}
+              <div className="flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 truncate">
+                  <span className="text-xs shrink-0">{isCafe ? "☕" : isBar ? "🍸" : "🍽️"}</span>
+                  <span className="text-xs font-black text-slate-900 truncate">
+                    {table.table_number || table.tableNumber || `T#${table.id}`}
                   </span>
                 </div>
 
                 <span
                   className={`
-                    rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider
+                    rounded-full px-1.5 py-0.2 text-[8px] font-extrabold uppercase tracking-wider shrink-0
                     ${
                       isAvailable
                         ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
@@ -398,37 +405,39 @@ function TableSelector({
                 </span>
               </div>
 
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                <span className="font-medium">
-                  {table.capacity || 1} {table.capacity === 1 ? "seat" : "seats"}
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
+                <span className="font-semibold text-slate-600">
+                  {table.capacity || 1}p
                 </span>
 
                 <span
-                  className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-                    isBar
+                  className={`rounded px-1 py-0.2 text-[8px] font-bold ${
+                    isCafe
+                      ? "bg-emerald-100 text-emerald-800"
+                      : isBar
                       ? "bg-amber-100 text-amber-800"
                       : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {isBar ? "Bar Stool" : "Dining"}
+                  {isCafe ? "Cafe" : isBar ? "Bar Stool" : "Dining"}
                 </span>
               </div>
 
               {/* Show Waiter/Bartender Badge if Occupied and Selectable */}
               {!isAvailable && canSelectTable && (
-                <div className="mt-2 flex items-center gap-1 rounded-lg bg-amber-100/90 px-2 py-1 text-[10px] font-bold text-amber-950 border border-amber-200/80">
+                <div className="mt-1.5 flex items-center gap-1 rounded bg-amber-100/90 px-1.5 py-0.5 text-[9px] font-bold text-amber-950 border border-amber-200/80 truncate">
                   <span>👤</span>
-                  <span className="truncate">Serving: {waiterName || (isBar ? "Bartender" : "Waiter")}</span>
+                  <span className="truncate">{waiterName || (isCafe ? "Barista" : isBar ? "Bartender" : "Waiter")}</span>
                 </div>
               )}
 
               {/* Show Lock Tag if locked for another staff */}
               {!canSelectTable && (
                 <div
-                  className="mt-2 flex items-center gap-1 rounded-lg bg-rose-100/90 px-2 py-1 text-[9px] font-extrabold text-rose-900 border border-rose-200"
+                  className="mt-1.5 flex items-center gap-0.5 rounded bg-rose-100/90 px-1.5 py-0.5 text-[8px] font-extrabold text-rose-900 border border-rose-200 truncate"
                   title={`Occupied by ${waiterName || "another staff"}`}
                 >
-                  🔒 Occupied by {waiterName || "another staff"}
+                  🔒 {waiterName || "Staff"}
                 </div>
               )}
             </button>

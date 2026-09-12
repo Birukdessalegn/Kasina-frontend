@@ -217,11 +217,11 @@ const navigationGroups = [
             path: "/bar",
             icon: Wine,
           },
-          {
-            name: "Bar Order Terminal",
-            path: "/pos",
-            icon: ShoppingCart,
-          },
+          // {
+          //   name: "Bar Order Terminal",
+          //   path: "/pos",
+          //   icon: ShoppingCart,
+          // },
           {
             name: "Bar Reports",
             path: "/bar/reports",
@@ -287,11 +287,6 @@ const navigationGroups = [
             name: "Inventory Dashboard",
             path: "/inventory",
             icon: Boxes,
-          },
-          {
-            name: "Stock Levels",
-            path: "/inventory/stock",
-            icon: Package,
           },
           {
             name: "Low Stock Alerts",
@@ -1129,6 +1124,7 @@ function DashboardLayout() {
           flex
           min-h-screen
           min-w-0
+          w-full
           flex-1
           flex-col
           transition-all
@@ -1136,8 +1132,8 @@ function DashboardLayout() {
 
           ${
             isCollapsed
-              ? "lg:ml-16"
-              : "lg:ml-56"
+              ? "lg:ml-16 lg:w-[calc(100%-4rem)]"
+              : "lg:ml-56 lg:w-[calc(100%-14rem)]"
           }
         `}
       >
@@ -1622,7 +1618,7 @@ function DashboardLayout() {
             BODY
         =================================================== */}
 
-        <main className="min-w-0 max-w-full flex-1 px-3 py-4 sm:p-6 lg:p-8 overflow-x-hidden">
+        <main className="w-full min-w-0 flex-1 px-2.5 py-3.5 sm:px-5 sm:py-5 lg:px-6 lg:py-6 overflow-x-hidden">
 
           <Outlet />
 

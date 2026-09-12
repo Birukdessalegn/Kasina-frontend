@@ -336,49 +336,49 @@ export default function RoomManagementPage() {
 
       {/* ROOM TYPES TABLE */}
       {activeTab === "types" && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {roomTypes.map((t) => (
             <div
               key={t.id}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs"
             >
               <div>
                 <div className="flex items-start justify-between">
-                  <h3 className="text-base font-bold text-slate-900">{t.name}</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{t.name}</h3>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenTypeModal(t)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                     >
-                      <Edit2 size={15} />
+                      <Edit2 size={13} />
                     </button>
                     <button
                       onClick={() => handleDeleteType(t.id, t.name)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-2xl font-black text-blue-600">
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-lg font-black text-blue-600">
                     ${Number(t.base_rate).toFixed(2)}
                   </span>
-                  <span className="text-xs text-slate-400">/ night</span>
+                  <span className="text-[10px] text-slate-400">/ night</span>
                 </div>
 
-                <p className="mt-2 text-xs text-slate-500 line-clamp-2">
+                <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">
                   {t.description || "No description provided."}
                 </p>
 
-                <div className="mt-4 flex items-center gap-4 text-xs text-slate-600">
+                <div className="mt-2.5 flex items-center gap-3 text-[11px] text-slate-600">
                   <span className="flex items-center gap-1">
-                    <Users size={14} className="text-slate-400" />
+                    <Users size={12} className="text-slate-400" />
                     Capacity: {t.capacity}
                   </span>
                   <span className="flex items-center gap-1">
-                    <DoorClosed size={14} className="text-slate-400" />
+                    <DoorClosed size={12} className="text-slate-400" />
                     Total: {t.total_rooms || 0}
                   </span>
                 </div>

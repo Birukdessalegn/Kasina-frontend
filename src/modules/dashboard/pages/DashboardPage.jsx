@@ -14,6 +14,7 @@ import {
   Sparkles,
   ArrowUpRight,
   Radio,
+  BedDouble,
 } from "lucide-react";
 import api from "../../../services/api";
 
@@ -326,32 +327,66 @@ export default function DashboardPage() {
     dashboard?.pending_bar_orders || 0
   );
 
+  const grandTotalRevenue = Number(
+    dashboard?.grand_total_revenue ??
+    dashboard?.all_time_sales ??
+    dashboard?.total_revenue ??
+    0
+  );
+
+  const roomSalesAllTime = Number(
+    dashboard?.room_sales_all_time ??
+    dashboard?.total_room_reservations_amount ??
+    0
+  );
+
+  const posSalesAllTime = Number(
+    dashboard?.pos_sales_all_time ??
+    dashboard?.today_sales ??
+    0
+  );
+
+  const activeFloorAmount = Number(
+    dashboard?.active_orders_amount ??
+    0
+  );
+
   // ============================================================
   // STAT CARDS
   // ============================================================
 
   const stats = [
     {
+      title: "Whole Hotel Revenue",
+      value: formatMoney(grandTotalRevenue),
+      description: "Rooms + Food & Bar (All-time)",
+      icon: Sparkles,
+      highlight: true,
+    },
+    {
+      title: "Room Lodging Sales",
+      value: formatMoney(roomSalesAllTime),
+      description: "100% Settled room bookings",
+      icon: BedDouble,
+    },
+    {
+      title: "Food & Bar Sales",
+      value: formatMoney(posSalesAllTime),
+      description: `Today: ${formatMoney(todaySales)}`,
+      icon: Utensils,
+    },
+    {
       title: "Today's Orders",
       value: todayOrders.toLocaleString(),
       description: "Orders created today",
       icon: ShoppingCart,
     },
-
     {
-      title: "Total Items Served",
-      value: totalItemsServed.toLocaleString(),
-      description: "Food & beverages served",
-      icon: Utensils,
+      title: "Active Floor Tabs",
+      value: formatMoney(activeFloorAmount),
+      description: `${activeTables} active tables on floor`,
+      icon: Clock,
     },
-
-    {
-      title: "Today's Revenue",
-      value: formatMoney(todaySales),
-      description: "Paid sales today",
-      icon: DollarSign,
-    },
-
     {
       title: "Pending Orders",
       value: (
@@ -425,36 +460,82 @@ export default function DashboardPage() {
       </div>
 
       {/* ======================================================
+          HOTEL MULTI-FIELD REVENUE COMMAND BANNER
+      ====================================================== */}
+      <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 p-4 text-white shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30">
+                WHOLE HOTEL REVENUE ACTIVE
+              </span>
+              <span className="text-xs font-semibold text-slate-300">Rooms + Food & Bar POS</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">
+              Whole Hotel Grand Revenue: <span className="text-amber-400 font-mono">{formatMoney(grandTotalRevenue)}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2.5 py-1">
+            <BedDouble className="h-3.5 w-3.5 text-blue-400" />
+            <span className="text-slate-300">Rooms:</span>
+            <span className="font-bold text-blue-300 font-mono">{formatMoney(roomSalesAllTime)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2.5 py-1">
+            <Utensils className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-slate-300">Food & Bar:</span>
+            <span className="font-bold text-emerald-300 font-mono">{formatMoney(posSalesAllTime)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2.5 py-1">
+            <Clock className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-slate-300">Floor Tabs:</span>
+            <span className="font-bold text-amber-300 font-mono">{formatMoney(activeFloorAmount)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================
           STATISTICS
       ====================================================== */}
 
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
 
           return (
             <div
               key={stat.title}
-              className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-xs transition hover:shadow-sm"
+              className={`rounded-xl border p-2.5 sm:p-3 shadow-xs transition hover:shadow-sm ${
+                stat.highlight
+                  ? "border-amber-300 bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20"
+                  : "border-gray-200 bg-white"
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500">
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     {stat.title}
                   </p>
 
-                  <h2 className="mt-1 text-xl font-bold text-gray-900">
+                  <h2 className="mt-0.5 text-base sm:text-lg font-bold text-gray-900 font-mono">
                     {stat.value}
                   </h2>
                 </div>
 
-                <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
-                  <Icon className="h-4 w-4" />
+                <div className={`rounded-lg p-1.5 ${
+                  stat.highlight ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-600"
+                }`}>
+                  <Icon className="h-3.5 w-3.5" />
                 </div>
               </div>
 
-              <div className="mt-2">
-                <span className="text-[11px] font-medium text-gray-400">
+              <div className="mt-1.5 border-t border-gray-100 pt-1">
+                <span className="text-[10px] font-medium text-gray-400">
                   {stat.description}
                 </span>
               </div>
@@ -467,7 +548,7 @@ export default function DashboardPage() {
           ADDITIONAL SUMMARY
       ====================================================== */}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Products */}
 
         <SummaryCard
@@ -990,24 +1071,24 @@ function SummaryCard({
   icon: Icon,
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-xs transition hover:shadow-sm">
+    <div className="rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3 shadow-xs transition hover:shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-medium text-gray-500">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
             {title}
           </p>
 
-          <h2 className="mt-1 text-xl font-bold text-gray-900">
+          <h2 className="mt-0.5 text-base sm:text-lg font-bold text-gray-900">
             {value}
           </h2>
 
-          <p className="mt-0.5 text-[11px] text-gray-400">
+          <p className="mt-0.5 text-[10px] text-gray-400">
             {description}
           </p>
         </div>
 
-        <div className="rounded-lg bg-gray-50 p-2 text-gray-600">
-          <Icon className="h-4 w-4" />
+        <div className="rounded-lg bg-gray-50 p-1.5 text-gray-600">
+          <Icon className="h-3.5 w-3.5" />
         </div>
       </div>
     </div>

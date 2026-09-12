@@ -58,12 +58,12 @@ import TodaySalesAuditPage from "../modules/pos/pages/TodaySalesAuditPage";
 import BarPage from "../modules/bar/pages/BarPage";
 
 import InventoryPage from "../modules/inventory/pages/InventoryPage";
-import InventoryStockPage from "../modules/inventory/pages/InventoryStockPage";
 import InventoryLowStockPage from "../modules/inventory/pages/InventoryLowStockPage";
 import InventoryTransactionsPage from "../modules/inventory/pages/InventoryTransactionsPage";
 import InventoryReportsPage from "../modules/inventory/pages/InventoryReportsPage";
 import CashierReconciliationPage from "../modules/finance/pages/CashierReconciliationPage";
 import FinanceSalesPage from "../modules/finance/pages/FinanceSalesPage";
+import FinanceDashboardPage from "../modules/finance/pages/FinanceDashboardPage";
 
 import FrontDeskPage from "../modules/frontdesk/pages/FrontDeskPage";
 import ReservationsListPage from "../modules/frontdesk/pages/ReservationsListPage";
@@ -339,7 +339,7 @@ function AppRoutes() {
 
               <Route
                 path="/inventory/stock"
-                element={<InventoryStockPage />}
+                element={<Navigate to="/inventory" replace />}
               />
 
               <Route
@@ -476,7 +476,7 @@ function AppRoutes() {
             >
               <Route
                 path="/finance"
-                element={<CashierReconciliationPage />}
+                element={<FinanceDashboardPage />}
               />
               <Route
                 path="/finance/cashier-reconciliation"
@@ -639,7 +639,7 @@ function AppRoutes() {
 
               <Route
                 path="/store/inventory/stock"
-                element={<InventoryStockPage />}
+                element={<Navigate to="/store/inventory" replace />}
               />
 
               <Route

@@ -21,6 +21,7 @@ import {
   ChevronRight,
   AlertTriangle,
   ArrowUpRight,
+  BedDouble,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../../../services/api";
@@ -28,7 +29,7 @@ import { printReportArea } from "../../../utils/printHelper";
 
 export default function MasterReportsPage() {
   // Filters State
-  const [activeDept, setActiveDept] = useState("all"); // "all" | "bar" | "kitchen" | "inventory" | "purchasing" | "pos"
+  const [activeDept, setActiveDept] = useState("all"); // "all" | "rooms" | "bar" | "kitchen" | "inventory" | "purchasing" | "pos"
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [activePreset, setActivePreset] = useState("today");
@@ -38,6 +39,7 @@ export default function MasterReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [orders, setOrders] = useState([]);
+  const [roomReservations, setRoomReservations] = useState([]);
   const [barOrders, setBarOrders] = useState([]);
   const [kitchenOrders, setKitchenOrders] = useState([]);
   const [products, setProducts] = useState([]);
@@ -63,7 +65,7 @@ export default function MasterReportsPage() {
       setLoading(true);
       setError("");
 
-      const [ordersRes, purchasesRes, inventoryRes, expensesRes, dashRes, barRes, kitchen1Res, kitchen2Res, prodRes] = await Promise.all([
+      const [ordersRes, purchasesRes, inventoryRes, expensesRes, dashRes, barRes, kitchen1Res, kitchen2Res, prodRes, roomsRes] = await Promise.all([
         api("/pos/orders").catch(() => api("/orders").catch(() => [])),
         api("/purchasing").catch(() => api("/purchases").catch(() => [])),
         api("/inventory/multi-location").catch(() => api("/inventory").catch(() => [])),
@@ -73,10 +75,14 @@ export default function MasterReportsPage() {
         api("/kitchen").catch(() => []),
         api("/kitchen/orders").catch(() => []),
         api("/products").catch(() => []),
+        api("/room-reservations").catch(() => api("/rooms/reservations").catch(() => [])),
       ]);
 
       const rawOrders = ordersRes.orders || ordersRes.data || (Array.isArray(ordersRes) ? ordersRes : []);
       setOrders(rawOrders);
+
+      const rawRooms = roomsRes.reservations || roomsRes.data || (Array.isArray(roomsRes) ? roomsRes : []);
+      setRoomReservations(rawRooms);
 
       const rawBar = barRes.orders || barRes.data || (Array.isArray(barRes) ? barRes : []);
       setBarOrders(rawBar);
@@ -313,6 +319,14 @@ export default function MasterReportsPage() {
     });
   }, [expenses, fromDate, toDate]);
 
+  // Filtered Room Reservations within Date Range
+  const filteredRoomReservations = useMemo(() => {
+    return roomReservations.filter((r) => {
+      const d = r.created_at || r.createdAt || r.check_in_date || r.date;
+      return isDateInRange(d);
+    });
+  }, [roomReservations, fromDate, toDate]);
+
   // Product Price Lookup Map for reliable pricing resolution
   const productPriceMap = useMemo(() => {
     const map = new Map();
@@ -327,6 +341,8 @@ export default function MasterReportsPage() {
   // Consolidated & Departmental Metrics Calculation
   const metrics = useMemo(() => {
     // 1. POS / Sales Calculations
+    let posSettledSales = 0;
+    let floorTabsRevenue = 0;
     let grossSales = 0;
     let totalItemsSold = 0;
     let barSales = 0;
@@ -340,11 +356,19 @@ export default function MasterReportsPage() {
 
     filteredOrders.forEach((o) => {
       const status = String(o.status || "").toLowerCase();
+      const payStatus = String(o.payment_status || "").toLowerCase();
       if (status === "cancelled" || status === "void") return;
-      if (status === "completed" || status === "served" || status === "paid") completedOrders++;
 
       const amt = Number(o.total_amount || o.total || o.subtotal || 0);
       grossSales += amt;
+
+      const isPaid = payStatus === "paid" || status === "completed" || status === "served";
+      if (isPaid) {
+        completedOrders++;
+        posSettledSales += amt;
+      } else {
+        floorTabsRevenue += amt;
+      }
 
       const items = parseItems(o.items || o.order_items);
 
@@ -397,7 +421,7 @@ export default function MasterReportsPage() {
       }
     });
 
-    // Calculate Kitchen Metrics exactly matching KitchenReportsPage (265,150 ETB / 58 tickets)
+    // Calculate Kitchen Metrics exactly matching KitchenReportsPage
     kitchenSales = 0;
     kitchenItemsCount = 0;
 
@@ -462,12 +486,45 @@ export default function MasterReportsPage() {
       }
     });
 
-    // 4. Net Operating Balance
+    // 4. Room Lodging Calculations (Consolidated Hotel Revenue)
+    let roomRevenue = 0;
+    let pendingRoomRevenue = 0;
+    let roomBookingsCount = 0;
+    let roomNightsCount = 0;
+
+    filteredRoomReservations.forEach((rm) => {
+      const status = String(rm.status || "").toLowerCase();
+      const payStatus = String(rm.payment_status || "").toLowerCase();
+      if (status === "cancelled" || status === "rejected") return;
+
+      const amt = Number(rm.total_price || rm.total_amount || rm.amount || 0);
+      const nights = Number(rm.nights || 1);
+      roomBookingsCount++;
+      roomNightsCount += nights;
+
+      if (payStatus === "paid" || status === "checked_in" || status === "checked_out" || status === "confirmed") {
+        roomRevenue += amt;
+      } else {
+        pendingRoomRevenue += amt;
+      }
+    });
+
+    // 5. Net Operating Balance across Whole Hotel
     const totalExpensesAmt = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const netProfit = grossSales - totalPurchasesSpend - totalExpensesAmt;
+    const grandHotelRevenue = roomRevenue + posSettledSales;
+    const totalHotelVolume = roomRevenue + pendingRoomRevenue + grossSales;
+    const netProfit = grandHotelRevenue - totalPurchasesSpend - totalExpensesAmt;
 
     return {
+      grandHotelRevenue,
+      totalHotelVolume,
+      roomRevenue,
+      pendingRoomRevenue,
+      roomBookingsCount,
+      roomNightsCount,
       grossSales,
+      posSettledSales,
+      floorTabsRevenue,
       totalOrders: filteredOrders.length,
       completedOrders,
       totalItemsSold,
@@ -487,31 +544,50 @@ export default function MasterReportsPage() {
       lowStockCount,
       netProfit,
     };
-  }, [filteredOrders, filteredBarOrders, filteredKitchenOrders, filteredPurchases, filteredExpenses, inventory, productPriceMap]);
+  }, [filteredOrders, filteredRoomReservations, filteredBarOrders, filteredKitchenOrders, filteredPurchases, filteredExpenses, inventory, productPriceMap]);
 
   // Department-Specific Ledger Items (accurately filtered by selected location)
   const ledgerRows = useMemo(() => {
     let rows = [];
 
-    // 1. Front POS Orders
+    // 0. Hotel Room Lodging
+    if (activeDept === "all" || activeDept === "rooms") {
+      filteredRoomReservations.forEach((rm) => {
+        const isPaid = String(rm.payment_status || "").toLowerCase() === "paid" || ["checked_in", "checked_out", "confirmed"].includes(String(rm.status || "").toLowerCase());
+        rows.push({
+          type: "room_booking",
+          department: "Hotel Room Lodging",
+          id: rm.booking_reference || rm.reservation_code || `ROOM-#${rm.id}`,
+          title: `Room ${rm.room_number || rm.room?.room_number || "Suite"} (${rm.guest_name || rm.guest?.full_name || "Guest"}) - ${rm.nights || 1} nights`,
+          amount: Number(rm.total_price || rm.total_amount || rm.amount || 0),
+          status: isPaid ? "PAID / SETTLED" : (rm.status || "CONFIRMED"),
+          date: rm.created_at || rm.check_in_date || rm.date,
+          user: rm.receptionist_name || rm.guest_name || "Front Desk",
+          badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
+        });
+      });
+    }
+
+    // 1. Front POS Orders (in "all" or "pos" view)
     if (activeDept === "all" || activeDept === "pos") {
       filteredOrders.forEach((o) => {
+        const isPaid = String(o.payment_status || "").toLowerCase() === "paid" || ["completed", "served"].includes(String(o.status || "").toLowerCase());
         rows.push({
           type: "pos_order",
           department: "Front POS",
           id: o.order_number || `ORD-#${o.id}`,
           title: o.customer_name ? `Order for ${o.customer_name}` : `Table ${o.table_number || o.table_id || "-"}`,
           amount: Number(o.total_amount || o.total || 0),
-          status: o.status || "completed",
+          status: isPaid ? "SETTLED" : "OPEN TAB",
           date: o.created_at || o.createdAt,
           user: o.waiter_name || o.cashier_name || "Staff",
-          badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+          badgeColor: isPaid ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200",
         });
       });
     }
 
-    // 2. Bar Sub-Store
-    if (activeDept === "all" || activeDept === "bar") {
+    // 2. Bar Sub-Store (Only in dedicated Bar view - prevents duplicate rows in All Outlets!)
+    if (activeDept === "bar") {
       const seenBarIds = new Set();
 
       // First check dedicated tickets from /bar/orders
@@ -583,8 +659,8 @@ export default function MasterReportsPage() {
       });
     }
 
-    // 3. Kitchen Sub-Store (matching KitchenReportsPage 100%)
-    if (activeDept === "all" || activeDept === "kitchen") {
+    // 3. Kitchen Sub-Store (Only in dedicated Kitchen view - prevents duplicate rows in All Outlets!)
+    if (activeDept === "kitchen") {
       filteredKitchenOrders.forEach((ko) => {
         const items = parseItems(ko.items || ko.order_items);
         const titleStr = items.length > 0
@@ -621,8 +697,8 @@ export default function MasterReportsPage() {
       });
     }
 
-    // 4. Purchasing & Suppliers
-    if (activeDept === "all" || activeDept === "purchasing") {
+    // 4. Purchasing & Suppliers (Only in dedicated Purchasing view - avoids mixing expenses with sales!)
+    if (activeDept === "purchasing") {
       filteredPurchases.forEach((p) => {
         rows.push({
           type: "purchase_order",
@@ -670,7 +746,7 @@ export default function MasterReportsPage() {
     }
 
     return rows;
-  }, [filteredOrders, filteredBarOrders, filteredKitchenOrders, filteredPurchases, inventory, activeDept, searchQuery]);
+  }, [filteredOrders, filteredRoomReservations, filteredBarOrders, filteredKitchenOrders, filteredPurchases, inventory, activeDept, searchQuery]);
 
   // Paginated Rows
   const totalPages = Math.ceil(ledgerRows.length / pageSize) || 1;
@@ -695,7 +771,7 @@ export default function MasterReportsPage() {
             </h1>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Consolidated enterprise intelligence across POS, Bar, Kitchen, Inventory, and Purchasing
+            Consolidated enterprise intelligence across Hotel Rooms Lodging, POS, Bar, Kitchen, Inventory, and Purchasing
           </p>
         </div>
 
@@ -726,11 +802,12 @@ export default function MasterReportsPage() {
 
         {[
           { id: "all", label: "All Outlets (Enterprise)", icon: Building2 },
+          { id: "rooms", label: "Hotel Room Lodging", icon: BedDouble },
+          { id: "pos", label: "POS / Cashiering", icon: ShoppingBag },
           { id: "bar", label: "Bar Sub-Store", icon: Wine },
           { id: "kitchen", label: "Kitchen Sub-Store", icon: UtensilsCrossed },
           { id: "inventory", label: "Inventory & Warehouse", icon: Package },
           { id: "purchasing", label: "Purchasing & Suppliers", icon: Truck },
-          { id: "pos", label: "POS / Cashiering", icon: ShoppingBag },
         ].map((dept) => {
           const Icon = dept.icon;
           const isActive = activeDept === dept.id;
@@ -819,7 +896,9 @@ export default function MasterReportsPage() {
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">KASINA HOTEL & SUITES</h1>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mt-0.5">
-                {activeDept === "bar"
+                {activeDept === "rooms"
+                  ? "HOTEL ROOM LODGING, ACCOMMODATION & RESERVATION AUDIT REPORT"
+                  : activeDept === "bar"
                   ? "BAR OUTLET SALES, SHOTS & BEVERAGE AUDIT REPORT"
                   : activeDept === "kitchen"
                   ? "KITCHEN OUTLET FOOD PRODUCTION & ORDER AUDIT REPORT"
@@ -829,7 +908,7 @@ export default function MasterReportsPage() {
                   ? "PURCHASING, SUPPLIER PROCUREMENT & CREDIT AUDIT"
                   : activeDept === "pos"
                   ? "FRONT-OF-HOUSE CASHIER, SALES & WAITER AUDIT"
-                  : "CONSOLIDATED ENTERPRISE MASTER OPERATIONS AUDIT"}
+                  : "CONSOLIDATED ENTERPRISE MASTER OPERATIONS & MULTI-FIELD AUDIT"}
               </p>
             </div>
             <div className="text-right text-xs">
@@ -840,187 +919,269 @@ export default function MasterReportsPage() {
           </div>
         </div>
 
-        {/* DYNAMIC EXECUTIVE KPI CARDS */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* MULTI-FIELD ENTERPRISE REVENUE BANNER */}
+        {activeDept === "all" && (
+          <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-r from-amber-500/10 via-slate-900/5 to-indigo-500/10 p-4.5 shadow-xs">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs shrink-0">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900">
+                      Consolidated Enterprise Hotel Revenue (All Fields)
+                    </h3>
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 border border-emerald-200">
+                      Live Multi-Department Sync
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Real-time data: Settled collections across Rooms Lodging and Restaurant & Bar POS, plus Active Floor Pipeline
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 text-indigo-900">
+                  <span className="text-slate-500 font-semibold mr-1">🏨 Rooms Lodging:</span>
+                  <span className="font-black">{formatMoney(metrics.roomRevenue)}</span>
+                </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1.5 text-blue-900">
+                  <span className="text-slate-500 font-semibold mr-1">🍽️ F&B Settled:</span>
+                  <span className="font-black">{formatMoney(metrics.posSettledSales)}</span>
+                </div>
+                <div className="rounded-xl border border-amber-300 bg-amber-50/90 px-3 py-1.5 text-amber-950">
+                  <span className="text-amber-700 font-semibold mr-1">⏳ Floor Tabs:</span>
+                  <span className="font-black">{formatMoney(metrics.floorTabsRevenue)}</span>
+                </div>
+                <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-emerald-950 font-black shadow-2xs">
+                  <span className="text-emerald-700 font-bold mr-1">Settled Revenue:</span>
+                  <span>{formatMoney(metrics.grandHotelRevenue)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DYNAMIC EXECUTIVE KPI CARDS (COMPACT & SMALL) */}
+        <div className={`grid gap-2 sm:gap-2.5 grid-cols-2 ${activeDept === "all" ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
           {activeDept === "all" && (
             <>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-2.5 sm:p-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gross Sales Revenue</span>
-                  <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                    <DollarSign className="h-5 w-5" />
+                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Whole Hotel Settled</span>
+                  <div className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                    <DollarSign className="h-4 w-4" />
                   </div>
                 </div>
-                <p className="mt-3 text-2xl font-black text-slate-900">{formatMoney(metrics.grossSales)}</p>
-                <p className="mt-1 text-xs text-slate-400">{metrics.totalOrders} total customer orders</p>
+                <p className="mt-1 text-base sm:text-lg font-black text-emerald-950">{formatMoney(metrics.grandHotelRevenue)}</p>
+                <p className="mt-0.5 text-[10px] text-emerald-700 font-semibold truncate">Rooms ({formatMoney(metrics.roomRevenue)}) + POS ({formatMoney(metrics.posSettledSales)})</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/30 p-2.5 sm:p-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bar Drinks Revenue</span>
-                  <div className="h-9 w-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                    <Wine className="h-5 w-5" />
+                  <span className="text-[10px] sm:text-[11px] font-bold text-indigo-800 uppercase tracking-wider">Room Lodging</span>
+                  <div className="h-7 w-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                    <BedDouble className="h-4 w-4" />
                   </div>
                 </div>
-                <p className="mt-3 text-2xl font-black text-purple-700">{formatMoney(metrics.barSales)}</p>
-                <p className="mt-1 text-xs text-slate-400">{metrics.barItemsCount} drinks & shots poured</p>
+                <p className="mt-1 text-base sm:text-lg font-black text-indigo-950">{formatMoney(metrics.roomRevenue)}</p>
+                <p className="mt-0.5 text-[10px] text-indigo-700 truncate">{metrics.roomBookingsCount} bookings • {metrics.roomNightsCount} nights</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/30 p-2.5 sm:p-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kitchen Food Revenue</span>
-                  <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                    <UtensilsCrossed className="h-5 w-5" />
+                  <span className="text-[10px] sm:text-[11px] font-bold text-blue-800 uppercase tracking-wider">Food & Bar Settled</span>
+                  <div className="h-7 w-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <ShoppingBag className="h-4 w-4" />
                   </div>
                 </div>
-                <p className="mt-3 text-2xl font-black text-amber-800">{formatMoney(metrics.kitchenSales)}</p>
-                <p className="mt-1 text-xs text-slate-400">{metrics.kitchenItemsCount} dishes served</p>
+                <p className="mt-1 text-base sm:text-lg font-black text-blue-950">{formatMoney(metrics.posSettledSales)}</p>
+                <p className="mt-0.5 text-[10px] text-blue-700 truncate">{metrics.completedOrders} orders settled</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-2.5 sm:p-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Procurement Spend</span>
-                  <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                    <Truck className="h-5 w-5" />
+                  <span className="text-[10px] sm:text-[11px] font-bold text-amber-800 uppercase tracking-wider">Active Floor Tabs</span>
+                  <div className="h-7 w-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                    <TrendingUp className="h-4 w-4" />
                   </div>
                 </div>
-                <p className="mt-3 text-2xl font-black text-slate-900">{formatMoney(metrics.totalPurchasesSpend)}</p>
-                <p className="mt-1 text-xs text-slate-400">{metrics.totalPurchasesCount} purchase orders</p>
+                <p className="mt-1 text-base sm:text-lg font-black text-amber-950">{formatMoney(metrics.floorTabsRevenue)}</p>
+                <p className="mt-0.5 text-[10px] text-amber-700 font-semibold truncate">Pipeline: {formatMoney(metrics.totalHotelVolume)}</p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Net Operating</span>
+                  <div className="h-7 w-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{formatMoney(metrics.netProfit)}</p>
+                <p className="mt-0.5 text-[10px] text-slate-500 truncate">Settled minus operating</p>
               </div>
             </>
           )}
 
           {activeDept === "bar" && (
             <>
-              <div className="rounded-2xl border border-purple-200 bg-purple-50/40 p-5 shadow-xs">
-                <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">Total Bar Sales</span>
-                <p className="mt-3 text-2xl font-black text-purple-900">{formatMoney(metrics.barSales)}</p>
-                <p className="mt-1 text-xs text-purple-600">Beverage sales during period</p>
+              <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-purple-700 uppercase tracking-wider">Total Bar Sales</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-purple-900">{formatMoney(metrics.barSales)}</p>
+                <p className="mt-0.5 text-[10px] text-purple-600 truncate">Beverage sales during period</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Servings Sold</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">{metrics.barItemsCount} Drinks / Shots</p>
-                <p className="mt-1 text-xs text-slate-400">All liquid portions sold</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Servings Sold</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{metrics.barItemsCount} Drinks</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Liquid portions sold</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bar Stock Valuation</span>
-                <p className="mt-3 text-2xl font-black text-amber-700">{formatMoney(metrics.barStockVal)}</p>
-                <p className="mt-1 text-xs text-slate-400">On-hand drinks in bar storage</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock Valuation</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-amber-700">{formatMoney(metrics.barStockVal)}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">On-hand bar storage</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Average Drink Price</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Avg Drink Price</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">
                   {metrics.barItemsCount > 0 ? formatMoney(metrics.barSales / metrics.barItemsCount) : "0 ETB"}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">Per serving realization</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Per serving realization</p>
               </div>
             </>
           )}
 
           {activeDept === "kitchen" && (
             <>
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-xs">
-                <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Kitchen Food Sales</span>
-                <p className="mt-3 text-2xl font-black text-amber-950">{formatMoney(metrics.kitchenSales)}</p>
-                <p className="mt-1 text-xs text-amber-700">Food sales during period</p>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-amber-800 uppercase tracking-wider">Kitchen Food Sales</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-amber-950">{formatMoney(metrics.kitchenSales)}</p>
+                <p className="mt-0.5 text-[10px] text-amber-700 truncate">Food sales during period</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Dishes Served</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">{metrics.kitchenItemsCount} Plates</p>
-                <p className="mt-1 text-xs text-slate-400">Prepared by kitchen staff</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Dishes Served</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{metrics.kitchenItemsCount} Plates</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Prepared by kitchen staff</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kitchen Stock Valuation</span>
-                <p className="mt-3 text-2xl font-black text-emerald-700">{formatMoney(metrics.kitchenStockVal)}</p>
-                <p className="mt-1 text-xs text-slate-400">Food ingredients on-hand</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock Valuation</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-emerald-700">{formatMoney(metrics.kitchenStockVal)}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Food ingredients on-hand</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Average Plate Price</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Avg Plate Price</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">
                   {metrics.kitchenItemsCount > 0 ? formatMoney(metrics.kitchenSales / metrics.kitchenItemsCount) : "0 ETB"}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">Realization per dish</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Realization per dish</p>
               </div>
             </>
           )}
 
           {activeDept === "inventory" && (
             <>
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5 shadow-xs">
-                <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">Total Stock Valuation</span>
-                <p className="mt-3 text-2xl font-black text-blue-950">{formatMoney(metrics.totalStockValuation)}</p>
-                <p className="mt-1 text-xs text-blue-700">Across Central, Bar, and Kitchen</p>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-blue-800 uppercase tracking-wider">Stock Valuation</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-blue-950">{formatMoney(metrics.totalStockValuation)}</p>
+                <p className="mt-0.5 text-[10px] text-blue-700 truncate">Central, Bar, and Kitchen</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Central Store Value</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">{formatMoney(metrics.centralStockVal)}</p>
-                <p className="mt-1 text-xs text-slate-400">Main warehouse balance</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Central Store</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{formatMoney(metrics.centralStockVal)}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Main warehouse balance</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Catalog SKUs</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">{inventory.length} Items</p>
-                <p className="mt-1 text-xs text-slate-400">Configured in system</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Catalog SKUs</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{inventory.length} Items</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Configured in system</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Low Stock Warnings</span>
-                <p className="mt-3 text-2xl font-black text-rose-600">{metrics.lowStockCount} Items</p>
-                <p className="mt-1 text-xs text-rose-500 font-semibold">Below safety threshold</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Low Stock</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-rose-600">{metrics.lowStockCount} Items</p>
+                <p className="mt-0.5 text-[10px] text-rose-500 font-semibold truncate">Below threshold</p>
               </div>
             </>
           )}
 
           {activeDept === "purchasing" && (
             <>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-xs">
-                <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Spend</span>
-                <p className="mt-3 text-2xl font-black text-emerald-950">{formatMoney(metrics.totalPurchasesSpend)}</p>
-                <p className="mt-1 text-xs text-emerald-700">Total goods procured</p>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Total Spend</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-emerald-950">{formatMoney(metrics.totalPurchasesSpend)}</p>
+                <p className="mt-0.5 text-[10px] text-emerald-700 truncate">Total goods procured</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Orders Received</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Orders Received</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">
                   {metrics.totalReceivedPurchases} / {metrics.totalPurchasesCount}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">Checked into inventory</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Checked into inventory</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Unpaid Credit</span>
-                <p className="mt-3 text-2xl font-black text-amber-700">{formatMoney(metrics.unpaidCreditPurchases)}</p>
-                <p className="mt-1 text-xs text-amber-600 font-semibold">Owed to suppliers</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unpaid Credit</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-amber-700">{formatMoney(metrics.unpaidCreditPurchases)}</p>
+                <p className="mt-0.5 text-[10px] text-amber-600 font-semibold truncate">Owed to suppliers</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Settled (Paid)</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Settled (Paid)</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">
                   {formatMoney(metrics.totalPurchasesSpend - metrics.unpaidCreditPurchases)}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">Paid out to suppliers</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Paid to suppliers</p>
+              </div>
+            </>
+          )}
+
+          {activeDept === "rooms" && (
+            <>
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-indigo-800 uppercase tracking-wider">Rooms Revenue</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-indigo-950">{formatMoney(metrics.roomRevenue)}</p>
+                <p className="mt-0.5 text-[10px] text-indigo-700 font-semibold truncate">Collected lodging</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Guest Bookings</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{metrics.roomBookingsCount} Res.</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Checked in & settled</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nights Booked</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{metrics.roomNightsCount} Nights</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Cumulative duration</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Average Yield</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">
+                  {metrics.roomBookingsCount > 0 ? formatMoney(metrics.roomRevenue / metrics.roomBookingsCount) : "0 ETB"}
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Per reservation yield</p>
               </div>
             </>
           )}
 
           {activeDept === "pos" && (
             <>
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5 shadow-xs">
-                <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">POS Sales Revenue</span>
-                <p className="mt-3 text-2xl font-black text-blue-950">{formatMoney(metrics.grossSales)}</p>
-                <p className="mt-1 text-xs text-blue-700">Cashier settled volume</p>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-blue-800 uppercase tracking-wider">POS Sales</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-blue-950">{formatMoney(metrics.grossSales)}</p>
+                <p className="mt-0.5 text-[10px] text-blue-700 truncate">Cashier settled volume</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tickets</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">{metrics.totalOrders} Orders</p>
-                <p className="mt-1 text-xs text-slate-400">Served & paid</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Tickets</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">{metrics.totalOrders} Orders</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Served & paid</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Average Order Value</span>
-                <p className="mt-3 text-2xl font-black text-slate-900">
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Average Order</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-slate-900">
                   {metrics.totalOrders > 0 ? formatMoney(metrics.grossSales / metrics.totalOrders) : "0 ETB"}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">Spend per table ticket</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Spend per table ticket</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed Orders</span>
-                <p className="mt-3 text-2xl font-black text-emerald-600">{metrics.completedOrders}</p>
-                <p className="mt-1 text-xs text-slate-400">Fulfilled without cancellation</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed</span>
+                <p className="mt-1 text-base sm:text-lg font-black text-emerald-600">{metrics.completedOrders}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400 truncate">Fulfilled without cancel</p>
               </div>
             </>
           )}
@@ -1113,7 +1274,16 @@ export default function MasterReportsPage() {
                 <tfoot>
                   <tr className="border-t-2 border-slate-300 bg-slate-100 font-black text-slate-900">
                     <td colSpan="6" className="py-3 px-4 text-right text-xs uppercase tracking-wider">
-                      Grand Total Amount ({activeDept.toUpperCase()}):
+                      {activeDept === "all" ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span>Grand Total Ledger Amount (All Outlets):</span>
+                          <span className="text-[11px] text-slate-500 font-normal">
+                            Settled Collections: {formatMoney(metrics.grandHotelRevenue)} • Active Floor Tabs: {formatMoney(metrics.floorTabsRevenue)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span>Grand Total Amount ({activeDept.toUpperCase()}):</span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right text-sm font-black text-slate-950">
                       {formatMoney(ledgerRows.reduce((acc, r) => acc + Number(r.amount || 0), 0))}
@@ -1173,13 +1343,14 @@ export default function MasterReportsPage() {
           Click any department below to open its full specialized reporting interface:
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 pt-1">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 pt-1">
           {[
+            { title: "Room Lodging Hub", path: "/rooms", icon: BedDouble, color: "text-indigo-600 bg-indigo-50" },
             { title: "POS Sales Reports", path: "/pos/reports", icon: ShoppingBag, color: "text-blue-600 bg-blue-50" },
             { title: "Bar Drinks & Shots", path: "/bar/reports", icon: Wine, color: "text-purple-600 bg-purple-50" },
             { title: "Kitchen Prep Reports", path: "/kitchen/reports", icon: UtensilsCrossed, color: "text-amber-600 bg-amber-50" },
             { title: "Inventory Valuation", path: "/inventory/reports", icon: Package, color: "text-emerald-600 bg-emerald-50" },
-            { title: "Purchasing & Spend", path: "/purchasing/reports", icon: Truck, color: "text-indigo-600 bg-indigo-50" },
+            { title: "Purchasing & Spend", path: "/purchasing/reports", icon: Truck, color: "text-slate-700 bg-slate-100" },
           ].map((card) => {
             const Icon = card.icon;
             return (

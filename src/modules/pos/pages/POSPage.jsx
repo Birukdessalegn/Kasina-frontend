@@ -24,6 +24,17 @@ function POSPage() {
     fetchKitchenOrders,
   } = useRestaurant();
 
+  const [currentShift, setCurrentShift] = useState(null);
+  const [loadingShift, setLoadingShift] = useState(true);
+  const [isStartShiftModalOpen, setIsStartShiftModalOpen] = useState(false);
+  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
+
+  const [orderItems, setOrderItems] = useState([]);
+  const [orderType, setOrderType] = useState("Dine In");
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [portionModalProduct, setPortionModalProduct] = useState(null);
+
   const userRoleUpper = (user?.role || "").toUpperCase();
   const shiftOutletCode = (currentShift?.outlet_code || "").toUpperCase();
   const shiftOutletId = currentShift?.outlet_id;
@@ -62,17 +73,6 @@ function POSPage() {
   const initialVenue = isCafeActor ? "cafe" : isBartender ? "bar" : isRestaurantActor ? "restaurant" : "all";
   const [activeVenue, setActiveVenue] = useState(initialVenue);
   const [activeCategory, setActiveCategory] = useState("all");
-
-  const [orderItems, setOrderItems] = useState([]);
-  const [orderType, setOrderType] = useState("Dine In");
-  const [selectedTable, setSelectedTable] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [portionModalProduct, setPortionModalProduct] = useState(null);
-
-  const [currentShift, setCurrentShift] = useState(null);
-  const [loadingShift, setLoadingShift] = useState(true);
-  const [isStartShiftModalOpen, setIsStartShiftModalOpen] = useState(false);
-  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
 
   const fetchCurrentShift = async () => {
     try {

@@ -134,56 +134,56 @@ function HousekeepingPage() {
 
         <div
           onClick={() => setRoomFilter("available")}
-          className={`cursor-pointer rounded-2xl border p-4 transition ${
-            roomFilter === "available" ? "border-emerald-600 bg-emerald-600 text-white shadow-md" : "border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/60"
+          className={`cursor-pointer rounded-xl border p-2 sm:p-2.5 transition ${
+            roomFilter === "available" ? "border-emerald-600 bg-emerald-600 text-white shadow-xs" : "border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/60"
           }`}
         >
-          <span className={`text-xs font-bold uppercase ${roomFilter === "available" ? "text-white" : "text-emerald-700"}`}>
+          <span className={`text-[10px] sm:text-[11px] font-bold uppercase ${roomFilter === "available" ? "text-white" : "text-emerald-700"}`}>
             Ready (Clean)
           </span>
-          <p className={`mt-1 text-2xl font-black ${roomFilter === "available" ? "text-white" : "text-emerald-800"}`}>
+          <p className={`mt-0.5 text-base sm:text-lg font-black ${roomFilter === "available" ? "text-white" : "text-emerald-800"}`}>
             {stats.available}
           </p>
         </div>
 
         <div
           onClick={() => setRoomFilter("cleaning")}
-          className={`cursor-pointer rounded-2xl border p-4 transition ${
-            roomFilter === "cleaning" ? "border-amber-600 bg-amber-600 text-white shadow-md" : "border-amber-200 bg-amber-50/60 hover:bg-amber-100/60"
+          className={`cursor-pointer rounded-xl border p-2 sm:p-2.5 transition ${
+            roomFilter === "cleaning" ? "border-amber-600 bg-amber-600 text-white shadow-xs" : "border-amber-200 bg-amber-50/60 hover:bg-amber-100/60"
           }`}
         >
-          <span className={`text-xs font-bold uppercase ${roomFilter === "cleaning" ? "text-white" : "text-amber-700"}`}>
+          <span className={`text-[10px] sm:text-[11px] font-bold uppercase ${roomFilter === "cleaning" ? "text-white" : "text-amber-700"}`}>
             Needs Cleaning
           </span>
-          <p className={`mt-1 text-2xl font-black ${roomFilter === "cleaning" ? "text-white" : "text-amber-800"}`}>
+          <p className={`mt-0.5 text-base sm:text-lg font-black ${roomFilter === "cleaning" ? "text-white" : "text-amber-800"}`}>
             {stats.cleaning}
           </p>
         </div>
 
         <div
           onClick={() => setRoomFilter("occupied")}
-          className={`cursor-pointer rounded-2xl border p-4 transition ${
-            roomFilter === "occupied" ? "border-blue-600 bg-blue-600 text-white shadow-md" : "border-blue-200 bg-blue-50/60 hover:bg-blue-100/60"
+          className={`cursor-pointer rounded-xl border p-2 sm:p-2.5 transition ${
+            roomFilter === "occupied" ? "border-blue-600 bg-blue-600 text-white shadow-xs" : "border-blue-200 bg-blue-50/60 hover:bg-blue-100/60"
           }`}
         >
-          <span className={`text-xs font-bold uppercase ${roomFilter === "occupied" ? "text-white" : "text-blue-700"}`}>
+          <span className={`text-[10px] sm:text-[11px] font-bold uppercase ${roomFilter === "occupied" ? "text-white" : "text-blue-700"}`}>
             Occupied
           </span>
-          <p className={`mt-1 text-2xl font-black ${roomFilter === "occupied" ? "text-white" : "text-blue-800"}`}>
+          <p className={`mt-0.5 text-base sm:text-lg font-black ${roomFilter === "occupied" ? "text-white" : "text-blue-800"}`}>
             {stats.occupied}
           </p>
         </div>
 
         <div
           onClick={() => setRoomFilter("maintenance")}
-          className={`cursor-pointer rounded-2xl border p-4 transition ${
-            roomFilter === "maintenance" ? "border-rose-600 bg-rose-600 text-white shadow-md" : "border-rose-200 bg-rose-50/60 hover:bg-rose-100/60"
+          className={`cursor-pointer rounded-xl border p-2 sm:p-2.5 transition ${
+            roomFilter === "maintenance" ? "border-rose-600 bg-rose-600 text-white shadow-xs" : "border-rose-200 bg-rose-50/60 hover:bg-rose-100/60"
           }`}
         >
-          <span className={`text-xs font-bold uppercase ${roomFilter === "maintenance" ? "text-white" : "text-rose-700"}`}>
+          <span className={`text-[10px] sm:text-[11px] font-bold uppercase ${roomFilter === "maintenance" ? "text-white" : "text-rose-700"}`}>
             Maintenance
           </span>
-          <p className={`mt-1 text-2xl font-black ${roomFilter === "maintenance" ? "text-white" : "text-rose-800"}`}>
+          <p className={`mt-0.5 text-base sm:text-lg font-black ${roomFilter === "maintenance" ? "text-white" : "text-rose-800"}`}>
             {stats.maintenance}
           </p>
         </div>
@@ -193,7 +193,7 @@ function HousekeepingPage() {
       <div className="flex border-b border-slate-200">
         <button
           onClick={() => setActiveTab("rooms")}
-          className={`border-b-2 px-6 py-3 text-sm font-bold transition ${
+          className={`border-b-2 px-4 py-2.5 text-xs font-bold transition ${
             activeTab === "rooms"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -204,7 +204,7 @@ function HousekeepingPage() {
 
         <button
           onClick={() => setActiveTab("tasks")}
-          className={`border-b-2 px-6 py-3 text-sm font-bold transition flex items-center gap-2 ${
+          className={`border-b-2 px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
             activeTab === "tasks"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -212,7 +212,7 @@ function HousekeepingPage() {
         >
           Cleaning Task Queue
           {tasks.filter((t) => t.status !== "completed" && t.status !== "inspected").length > 0 && (
-            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">
+            <span className="rounded-full bg-amber-500 px-1.5 py-0.2 text-[10px] text-white">
               {tasks.filter((t) => t.status !== "completed" && t.status !== "inspected").length}
             </span>
           )}
@@ -220,7 +220,7 @@ function HousekeepingPage() {
 
         <button
           onClick={() => setActiveTab("linens")}
-          className={`border-b-2 px-6 py-3 text-sm font-bold transition ${
+          className={`border-b-2 px-4 py-2.5 text-xs font-bold transition ${
             activeTab === "linens"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -230,9 +230,9 @@ function HousekeepingPage() {
         </button>
       </div>
 
-      {/* Tab 1: Room Status Grid */}
+      {/* Tab 1: Room Status Grid (Compact) */}
       {activeTab === "rooms" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {filteredRooms.map((room) => {
             const isCleaning = room.status === "cleaning";
             const isAvailable = room.status === "available";
@@ -242,7 +242,7 @@ function HousekeepingPage() {
             return (
               <div
                 key={room.id}
-                className={`rounded-2xl border bg-white p-5 shadow-xs transition hover:shadow-md ${
+                className={`rounded-xl border bg-white p-2.5 sm:p-3 shadow-2xs transition hover:shadow-xs ${
                   isCleaning
                     ? "border-amber-300 bg-amber-50/20"
                     : isAvailable
@@ -254,19 +254,19 @@ function HousekeepingPage() {
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-black text-slate-900">
-                        Room {room.room_number}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-black text-slate-900 leading-tight">
+                        #{room.room_number}
                       </span>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                        Floor {room.floor}
+                      <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-bold text-slate-600">
+                        Fl {room.floor}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">{room.room_type_name}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">{room.room_type_name}</p>
                   </div>
 
                   <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-black uppercase border ${
+                    className={`rounded px-1.5 py-0.2 text-[8px] font-black uppercase border ${
                       isAvailable
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : isCleaning
@@ -281,39 +281,39 @@ function HousekeepingPage() {
                 </div>
 
                 {/* Active Cleaner info if assigned */}
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Assigned Staff:</span>
-                  <span className="font-bold text-slate-700">
+                <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400">Staff:</span>
+                  <span className="font-bold text-slate-700 truncate">
                     {room.cleaner_first_name
                       ? `${room.cleaner_first_name} ${room.cleaner_last_name || ""}`
-                      : "Not Assigned"}
+                      : "Unassigned"}
                   </span>
                 </div>
 
                 {/* Quick Actions */}
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-2 flex items-center gap-1">
                   {isCleaning ? (
                     <>
                       {room.active_task_id ? (
                         <button
                           onClick={() => handleUpdateTaskStatus(room.active_task_id, "inspected")}
-                          className="flex-1 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition text-center"
+                          className="flex-1 rounded-lg bg-emerald-600 py-1 text-[10px] font-bold text-white shadow-2xs hover:bg-emerald-500 transition text-center"
                         >
-                          Mark Clean & Ready
+                          Mark Ready
                         </button>
                       ) : (
                         <button
                           onClick={() => handleOpenAssignModal(room)}
-                          className="flex-1 rounded-xl bg-amber-500 py-2 text-xs font-bold text-slate-950 shadow-xs hover:bg-amber-400 transition"
+                          className="flex-1 rounded-lg bg-amber-500 py-1 text-[10px] font-bold text-slate-950 shadow-2xs hover:bg-amber-400 transition"
                         >
-                          Dispatch Cleaner
+                          Dispatch
                         </button>
                       )}
                     </>
                   ) : (
                     <button
                       onClick={() => handleOpenAssignModal(room)}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-100 transition"
                     >
                       Assign Task
                     </button>

@@ -274,14 +274,12 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
       )}
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm text-gray-500">
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 md:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+          <p className="text-[11px] font-semibold uppercase text-gray-500">
             New Orders
           </p>
-
-          <p className="mt-1 text-2xl font-bold text-yellow-600">
+          <p className="mt-0.5 text-lg sm:text-xl font-black text-yellow-600">
             {
               kitchenOrders.filter(
                 (order) => order.status === "pending"
@@ -290,12 +288,11 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm text-gray-500">
+        <div className="rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+          <p className="text-[11px] font-semibold uppercase text-gray-500">
             Preparing
           </p>
-
-          <p className="mt-1 text-2xl font-bold text-blue-600">
+          <p className="mt-0.5 text-lg sm:text-xl font-black text-blue-600">
             {
               kitchenOrders.filter(
                 (order) => order.status === "preparing"
@@ -304,12 +301,11 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm text-gray-500">
+        <div className="rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+          <p className="text-[11px] font-semibold uppercase text-gray-500">
             Ready
           </p>
-
-          <p className="mt-1 text-2xl font-bold text-green-600">
+          <p className="mt-0.5 text-lg sm:text-xl font-black text-green-600">
             {
               kitchenOrders.filter(
                 (order) => order.status === "ready"
@@ -318,16 +314,14 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm text-gray-500">
+        <div className="rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+          <p className="text-[11px] font-semibold uppercase text-gray-500">
             Total Orders
           </p>
-
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="mt-0.5 text-lg sm:text-xl font-black text-gray-900">
             {kitchenOrders.length}
           </p>
         </div>
-
       </div>
 
       {/* Kitchen Station / Outlet Selector Bar */}
