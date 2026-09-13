@@ -261,6 +261,11 @@ const navigationGroups = [
 
         children: [
           {
+            name: "Finance Overview",
+            path: "/finance",
+            icon: Wallet,
+          },
+          {
             name: "Sales Ledger",
             path: "/finance/sales",
             icon: TrendingUp,
@@ -620,20 +625,48 @@ function DashboardLayout() {
 
   const visibleNavigationGroups =
     navigationGroups
+      .filter((group) => {
+        /*
+          Finance roles are not allowed to see the Administration sidebar (HR, Attendance, etc.)
+        */
+        if (
+          (normalizedRole === "ACCOUNTANT_MANAGER" ||
+            normalizedRole === "ACCOUNTANT" ||
+            normalizedRole === "FINANCE") &&
+          group.title === "Administration"
+        ) {
+          return false;
+        }
+        return true;
+      })
       .map((group) => {
         const visibleItems = group.items
           .filter((item) => {
             /*
-              ADMIN should see everything.
+              Hide HR & employee items for finance roles
             */
-            if (normalizedRole === "ADMIN") {
+            if (
+              (normalizedRole === "ACCOUNTANT_MANAGER" ||
+                normalizedRole === "ACCOUNTANT" ||
+                normalizedRole === "FINANCE") &&
+              (item.permission === "employees.view" ||
+                item.path === "/employees" ||
+                item.path?.startsWith("/employees"))
+            ) {
+              return false;
+            }
+
+            /*
+              ADMIN and HOTEL_MANAGER should see everything.
+            */
+            if (normalizedRole === "ADMIN" || normalizedRole === "HOTEL_MANAGER") {
               return true;
             }
 
             /*
               WAITER restricted items (Allow POS & Served Orders)
             */
-            if (normalizedRole === "WAITER") {
+            if (normalizedRole === "WAITER" || normalizedRole === "CAFE_WAITER") {
               if (
                 item.path === "/tables" ||
                 item.permission === "tables.view"
@@ -659,13 +692,15 @@ function DashboardLayout() {
             }
 
             /*
-              Dashboard is strictly for ADMIN and MANAGER only.
+              Dashboard is strictly for executive management.
             */
 
             if (item.path === "/dashboard") {
               return (
                 normalizedRole === "ADMIN" ||
-                normalizedRole === "MANAGER"
+                normalizedRole === "HOTEL_MANAGER" ||
+                normalizedRole === "MANAGER" ||
+                normalizedRole === "COOPERATIVE_MANAGER"
               );
             }
 
@@ -676,7 +711,10 @@ function DashboardLayout() {
             ) {
               return (
                 normalizedRole === "ADMIN" ||
+                normalizedRole === "HOTEL_MANAGER" ||
                 normalizedRole === "MANAGER" ||
+                normalizedRole === "FNB_MANAGER" ||
+                normalizedRole === "KITCHEN_MANAGER" ||
                 normalizedRole === "FB_CONTROLLER"
               );
             }
@@ -727,7 +765,10 @@ function DashboardLayout() {
                 ) {
                   return (
                     normalizedRole === "ADMIN" ||
+                    normalizedRole === "HOTEL_MANAGER" ||
                     normalizedRole === "MANAGER" ||
+                    normalizedRole === "FNB_MANAGER" ||
+                    normalizedRole === "KITCHEN_MANAGER" ||
                     normalizedRole === "FB_CONTROLLER"
                   );
                 }
@@ -738,7 +779,9 @@ function DashboardLayout() {
             if (item.path === "/dashboard") {
               return {
                 ...item,
-                name: normalizedRole === "ADMIN" ? "Executive Live Command" : "Manager Dashboard",
+                name: (normalizedRole === "ADMIN" || normalizedRole === "HOTEL_MANAGER")
+                  ? "Executive Live Command"
+                  : "Manager Dashboard",
               };
             }
             return item;

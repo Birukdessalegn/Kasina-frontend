@@ -47,7 +47,6 @@ const rolePermissions = {
     "inventory",
     "purchasing",
     "products",
-    "employees",
   ],
 
   KITCHEN_MANAGER: ["kitchen", "kitchen_audit", "inventory", "products"],
@@ -78,8 +77,8 @@ const rolePermissions = {
   CHEF: ["kitchen"],
   CAFE_CHEF: ["kitchen"],
   BARTENDER: ["bar", "pos"],
-  ACCOUNTANT: ["finance", "expenses", "reports", "employees"],
-  FINANCE: ["finance", "expenses", "reports", "payments", "employees"],
+  ACCOUNTANT: ["finance", "expenses", "reports"],
+  FINANCE: ["finance", "expenses", "reports", "payments"],
 };
 
 function PermissionRoute({ permission }) {

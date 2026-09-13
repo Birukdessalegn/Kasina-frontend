@@ -49,7 +49,7 @@ export default function FinanceDashboardPage() {
 
       const [dashRes, roomsRes, ordersRes, pmtsRes, expRes, purRes, shiftsRes] = await Promise.all([
         api("/dashboard").catch(() => ({})),
-        api("/room-reservations").catch(() => api("/rooms/reservations").catch(() => ([]))),
+        api("/room-reservations").catch(() => ({ data: [] })),
         api("/pos/orders").catch(() => api("/orders").catch(() => ([]))),
         api("/payments").catch(() => ([])),
         api("/expenses").catch(() => ([])),
@@ -151,11 +151,8 @@ export default function FinanceDashboardPage() {
       Number(dashboardStats?.active_orders_amount || 0)
     );
 
-    // 5. TOTAL HOTEL BUSINESS VOLUME
-    const totalHotelPipeline = Math.max(
-      wholeHotelLifetimeRevenue + totalPendingFloorTabs,
-      Number(dashboardStats?.total_hotel_business_volume || 0)
-    );
+    // 5. TOTAL HOTEL BUSINESS VOLUME / PIPELINE (Settled Revenue + Unsettled Floor Tabs)
+    const totalHotelPipeline = wholeHotelLifetimeRevenue + totalPendingFloorTabs;
 
     // 6. OPERATING OUTFLOW (EXPENSES + PURCHASES)
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + Number(e.amount || e.total || 0), 0);
@@ -189,6 +186,7 @@ export default function FinanceDashboardPage() {
       todayPosSales,
       totalPendingFloorTabs,
       totalHotelPipeline,
+      totalHotelBusinessVolume: totalHotelPipeline,
       totalExpenses,
       totalPurchases,
       totalOutflow,
@@ -367,7 +365,7 @@ export default function FinanceDashboardPage() {
                 ALL REVENUE DEPARTMENTS LINKED
               </span>
               <span className="text-xs font-bold text-slate-300">
-                Live PostgreSQL Finance Aggregator
+                Consolidated Financial Flow
               </span>
             </div>
             <h2 className="text-lg sm:text-xl font-black text-white mt-0.5">
@@ -393,10 +391,10 @@ export default function FinanceDashboardPage() {
             <span className="text-slate-300 font-medium">Floor Tabs:</span>
             <span className="font-black text-amber-300 font-mono">{formatMoney(metrics.totalPendingFloorTabs)}</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 px-3 py-1.5 shadow-2xs">
-            <TrendingUp className="h-3.5 w-3.5 text-amber-400" />
-            <span className="text-amber-200 font-medium">Total Pipeline:</span>
-            <span className="font-black text-amber-300 font-mono">{formatMoney(metrics.totalHotelBusinessVolume)}</span>
+          <div className="flex items-center gap-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 px-3 py-1.5 shadow-2xs">
+            <CreditCard className="h-3.5 w-3.5 text-purple-300" />
+            <span className="text-purple-200 font-medium">Paid Collections:</span>
+            <span className="font-black text-purple-300 font-mono">{formatMoney(metrics.wholeHotelLifetimeRevenue)}</span>
           </div>
         </div>
       </div>

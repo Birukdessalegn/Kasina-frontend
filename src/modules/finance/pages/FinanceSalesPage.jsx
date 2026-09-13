@@ -57,6 +57,7 @@ function FinanceSalesPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all"); // "all" | "rooms" | "pos"
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "settled" | "open_tabs"
   const [paymentFilter, setPaymentFilter] = useState("all"); // "all" | "cash" | "digital" | "credit"
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -65,47 +66,112 @@ function FinanceSalesPage() {
   // Selected Transaction for Modal View
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Fetch Restaurant & Bar POS Sales Data
+  // Fetch Whole Hotel Sales Data (Room Lodging + Restaurant & Bar POS)
   const fetchSalesData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch POS orders and completed payments
-      const [posRes, paymentsRes] = await Promise.all([
+      // Fetch Room Reservations, POS orders, and completed payments concurrently
+      const [roomsRes, posRes, paymentsRes] = await Promise.all([
+        api("/room-reservations").catch(() => ({ data: [] })),
         api("/pos/orders").catch(() => api("/orders").catch(() => ({ orders: [] }))),
         api("/payments").catch(() => ([])),
       ]);
 
+      const rawRooms = roomsRes.reservations || roomsRes.data || (Array.isArray(roomsRes) ? roomsRes : []);
       const rawOrders = posRes.orders || posRes.data || (Array.isArray(posRes) ? posRes : []);
+      const rawPayments = paymentsRes.payments || paymentsRes.data || (Array.isArray(paymentsRes) ? paymentsRes : []);
       const records = [];
 
-      rawOrders.forEach((o) => {
-        const isSettled =
-          o.payment_status === "paid" ||
-          o.payment_status === "credit_approved" ||
-          o.status === "completed" ||
-          o.status === "served";
-
-        const amt = Number(o.total || o.total_amount || 0);
+      // 1. HOTEL ROOM LODGING REVENUE (Only Actually Paid Money)
+      rawRooms.forEach((r) => {
+        const paidAmt = Number(r.paid_amount || 0);
+        const amt = paidAmt > 0 ? paidAmt : (r.payment_status === "paid" ? Number(r.total_amount || 0) : 0);
 
         if (amt > 0) {
           records.push({
-            id: `pos-${o.id || o.order_id}`,
+            id: `room-${r.id || r.reservation_code || Math.random()}`,
+            rawId: r.id,
+            type: "room",
+            code: r.reservation_code || `#RES-${r.id}`,
+            department: "Hotel Room Lodging",
+            deptKey: "rooms",
+            customer: r.guest_name || r.customer_name || "Hotel Guest",
+            customerPhone: r.phone_number || r.guest_phone || r.customer_phone || "-",
+            tableOrRoom: r.room_number ? `Room #${r.room_number}` : (r.room_type_name ? `Room (${r.room_type_name})` : "Hotel Suite"),
+            staff: r.receptionist_name || r.created_by_name || r.user_name || "Front Desk",
+            payment_method: (r.payment_method || "cash").toLowerCase(),
+            amount: amt,
+            date: r.created_at || r.check_in_date || r.createdAt || r.date,
+            status: "paid",
+            isSettled: true,
+            raw: r,
+          });
+        }
+      });
+
+      // 2. RESTAURANT, CAFE & BAR POS SETTLED PAYMENTS (Only Actually Paid Money)
+      const linkedOrderIds = new Set();
+      rawPayments.forEach((p) => {
+        const amt = Number(p.amount || 0);
+        if (amt > 0) {
+          const linkedOrder = rawOrders.find((o) => String(o.id) === String(p.order_id));
+          if (p.order_id) linkedOrderIds.add(String(p.order_id));
+
+          records.push({
+            id: `pos-pay-${p.id}`,
+            rawId: p.id,
+            type: "pos",
+            code: p.order_number || (linkedOrder ? linkedOrder.order_number : `#PAY-${p.id}`),
+            department: "Restaurant & Bar POS",
+            deptKey: "pos",
+            customer: (linkedOrder && (linkedOrder.customer_name || linkedOrder.guest_name)) || "Restaurant Guest",
+            customerPhone: (linkedOrder && linkedOrder.customer_phone) || "-",
+            tableOrRoom: linkedOrder?.table_number ? `Table #${linkedOrder.table_number}` : (linkedOrder?.table_id ? `Table #${linkedOrder.table_id}` : "Bar / Takeout"),
+            staff: p.received_by_first_name ? `${p.received_by_first_name} ${p.received_by_last_name || ""}`.trim() : (linkedOrder?.cashier_name || linkedOrder?.waiter_name || "Cashier Staff"),
+            payment_method: (p.payment_method || "cash").toLowerCase(),
+            amount: amt,
+            date: p.paid_at || p.created_at || (linkedOrder && (linkedOrder.created_at || linkedOrder.createdAt)),
+            status: "paid",
+            isSettled: true,
+            raw: p,
+          });
+        }
+      });
+
+      // 3. UNPAID ACTIVE FLOOR TABS (Tracked separately as Pending / Unsettled)
+      rawOrders.forEach((o) => {
+        const st = String(o.status || "").toLowerCase();
+        const paySt = String(o.payment_status || "").toLowerCase();
+        const oId = String(o.id || o.order_id);
+
+        const isFullyPaid = paySt === "paid" || o.is_paid === true;
+        const isCancelled = st === "cancelled" || st === "void";
+
+        // Find how much has been paid for this order
+        const oPayments = rawPayments.filter((p) => String(p.order_id) === oId);
+        const paidSoFar = oPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        const orderTotal = Number(o.total || o.total_amount || 0);
+        const unpaidBalance = orderTotal - paidSoFar;
+
+        if (!isCancelled && !isFullyPaid && unpaidBalance > 0 && (st !== "completed" || paidSoFar === 0)) {
+          records.push({
+            id: `tab-${o.id || o.order_id}`,
             rawId: o.id || o.order_id,
             type: "pos",
             code: o.order_number || `#ORD-${o.id}`,
             department: "Restaurant & Bar POS",
             deptKey: "pos",
-            customer: o.customer_name || o.guest_name || "Walk-in Guest",
+            customer: o.customer_name || o.guest_name || "Floor Guest",
             customerPhone: o.customer_phone || "-",
-            tableOrRoom: o.table_number ? `Table #${o.table_number}` : o.table_id ? `Table #${o.table_id}` : "Bar / Takeout",
-            staff: o.cashier_name || o.waiter_name || o.user_name || "Cashier Staff",
-            payment_method: (o.payment_method || "cash").toLowerCase(),
-            amount: amt,
+            tableOrRoom: o.table_number ? `Table #${o.table_number}` : (o.table_id ? `Table #${o.table_id}` : "Floor Tab"),
+            staff: o.cashier_name || o.waiter_name || o.user_name || "Floor Waiter",
+            payment_method: (o.payment_method || "unpaid").toLowerCase(),
+            amount: unpaidBalance,
             date: o.created_at || o.createdAt || o.date,
-            status: isSettled ? "paid" : (o.status || "preparing"),
-            isSettled: isSettled,
+            status: "pending",
+            isSettled: false,
             raw: o,
           });
         }
@@ -115,7 +181,7 @@ function FinanceSalesPage() {
       records.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       setSalesRecords(records);
     } catch (err) {
-      console.error("Failed to load sales data:", err);
+      console.error("Failed to load whole-hotel sales data:", err);
       setError(err.message || "Failed to load sales transactions");
     } finally {
       setLoading(false);
@@ -166,10 +232,15 @@ function FinanceSalesPage() {
       if (startDate && recordDate && recordDate < startDate) return false;
       if (endDate && recordDate && recordDate > endDate) return false;
 
-      // Status Filter
-      if (departmentFilter !== "all") {
-        if (departmentFilter === "settled" && !r.isSettled) return false;
-        if (departmentFilter === "open_tabs" && r.isSettled) return false;
+      // Department Filter
+      if (departmentFilter !== "all" && r.deptKey !== departmentFilter) {
+        return false;
+      }
+
+      // Settlement Status Filter
+      if (statusFilter !== "all") {
+        if (statusFilter === "settled" && !r.isSettled) return false;
+        if (statusFilter === "open_tabs" && r.isSettled) return false;
       }
 
       // Payment Method Filter
@@ -195,46 +266,53 @@ function FinanceSalesPage() {
         const tableOrRoom = String(r.tableOrRoom || "").toLowerCase();
         const staff = String(r.staff || "").toLowerCase();
         const methodStr = String(r.payment_method || "").toLowerCase();
+        const dept = String(r.department || "").toLowerCase();
 
         return (
           code.includes(q) ||
           customer.includes(q) ||
           tableOrRoom.includes(q) ||
           staff.includes(q) ||
-          methodStr.includes(q)
+          methodStr.includes(q) ||
+          dept.includes(q)
         );
       }
 
       return true;
     });
-  }, [salesRecords, startDate, endDate, departmentFilter, paymentFilter, searchQuery]);
+  }, [salesRecords, startDate, endDate, departmentFilter, statusFilter, paymentFilter, searchQuery]);
 
-  // Aggregate Metrics
+  // Aggregate Metrics (Strictly Earned Paid Money)
   const metrics = useMemo(() => {
-    let totalGrossVolume = 0;
+    let roomPaidSales = 0;
+    let posPaidSales = 0;
     let settledSales = 0;
     let floorTabsRevenue = 0;
     let cashSales = 0;
     let digitalSales = 0;
     let creditSales = 0;
 
+    let roomCount = 0;
+    let posCount = 0;
     let settledCount = 0;
     let floorTabsCount = 0;
 
     filteredRecords.forEach((r) => {
       const amt = Number(r.amount || 0);
-      totalGrossVolume += amt;
 
       if (r.isSettled) {
         settledSales += amt;
         settledCount += 1;
-      } else {
-        floorTabsRevenue += amt;
-        floorTabsCount += 1;
-      }
 
-      const method = (r.payment_method || "cash").toLowerCase();
-      if (r.isSettled) {
+        if (r.deptKey === "rooms") {
+          roomPaidSales += amt;
+          roomCount += 1;
+        } else {
+          posPaidSales += amt;
+          posCount += 1;
+        }
+
+        const method = (r.payment_method || "cash").toLowerCase();
         if (method === "card" || method === "telebirr" || method === "cbe" || method === "mobile_money") {
           digitalSales += amt;
         } else if (method === "credit" || r.status === "credit_approved") {
@@ -242,19 +320,27 @@ function FinanceSalesPage() {
         } else {
           cashSales += amt;
         }
+      } else {
+        floorTabsRevenue += amt;
+        floorTabsCount += 1;
       }
     });
 
     return {
-      totalGrossVolume,
+      totalEarnedRevenue: settledSales,
+      totalGrossVolume: settledSales,
+      roomSales: roomPaidSales,
+      posSales: posPaidSales,
       settledSales,
       floorTabsRevenue,
+      roomCount,
+      posCount,
       settledCount,
       floorTabsCount,
       cashSales,
       digitalSales,
       creditSales,
-      totalCount: filteredRecords.length,
+      totalCount: settledCount,
     };
   }, [filteredRecords]);
 
@@ -270,12 +356,13 @@ function FinanceSalesPage() {
       }
     }
     if (Array.isArray(items) && items.length > 0) return items;
-    if (order.items_summary) return [{ name: order.items_summary, quantity: 1, price: order.total }];
     return [];
   };
 
+  const formatMoney = (val) => `${Number(val || 0).toLocaleString()} ETB`;
+
   const handlePrint = () => {
-    printReportArea("finance-sales-printable-area", "Restaurant & Bar Sales Ledger Report");
+    window.print();
   };
 
   return (
@@ -284,16 +371,16 @@ function FinanceSalesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full">
-              RESTAURANT & BAR POS AUDIT
+            <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full">
+              WHOLE HOTEL FINANCIAL AUDIT
             </span>
-            <span className="text-xs font-semibold text-slate-500">Dining • Bar • Takeout</span>
+            <span className="text-xs font-semibold text-slate-500">Rooms & Suites • Restaurant • Cafe • Bar</span>
           </div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900 mt-1">
-            POS Sales & Revenue Ledger
+            Whole-Hotel Sales & Revenue Ledger
           </h1>
           <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-            Audit restaurant and bar sales transactions, cashier collections, occupied table tabs, and payment channels.
+            Consolidated hotel sales tracking: Room lodging receipts, dining & bar POS collections, and multi-channel payment settlements.
           </p>
         </div>
 
@@ -304,17 +391,17 @@ function FinanceSalesPage() {
             disabled={loading}
             className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-emerald-600" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-amber-600" : ""}`} />
             Refresh
           </button>
 
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition"
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition"
           >
             <Printer className="h-4 w-4" />
-            Print POS Ledger
+            Print Master Ledger
           </button>
         </div>
       </div>
@@ -325,85 +412,120 @@ function FinanceSalesPage() {
         </div>
       )}
 
-      {/* KPI Cards: POS Sales Overview */}
+      {/* KPI Cards: Whole Hotel Revenue Overview */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total POS Sales Volume"
-          value={`${metrics.totalGrossVolume.toLocaleString()} ETB`}
-          subtext={`Across ${metrics.totalCount} dining orders in DB`}
+          title="Whole Hotel Earned Revenue"
+          value={`${metrics.settledSales.toLocaleString()} ETB`}
+          subtext={`Paid collections across ${metrics.settledCount} receipts (${metrics.roomCount} Rooms, ${metrics.posCount} POS)`}
           icon={Sparkles}
           color="text-amber-800"
           bg="bg-amber-50 border border-amber-200"
         />
 
         <StatCard
-          title="Settled Cash & Paid Sales"
-          value={`${metrics.settledSales.toLocaleString()} ETB`}
-          subtext={`${metrics.settledCount} paid restaurant & bar orders`}
+          title="Room Lodging Revenue"
+          value={`${metrics.roomSales.toLocaleString()} ETB`}
+          subtext={`${metrics.roomCount} paid bookings recorded`}
+          icon={BedDouble}
+          color="text-blue-700"
+          bg="bg-blue-50 border border-blue-100"
+        />
+
+        <StatCard
+          title="Restaurant & Bar POS Revenue"
+          value={`${metrics.posSales.toLocaleString()} ETB`}
+          subtext={`${metrics.posCount} paid receipts • (Unsettled Tabs: ${metrics.floorTabsRevenue.toLocaleString()} ETB)`}
           icon={UtensilsCrossed}
           color="text-emerald-700"
           bg="bg-emerald-50 border border-emerald-100"
         />
 
         <StatCard
-          title="Active Floor Tabs (Dining)"
-          value={`${metrics.floorTabsRevenue.toLocaleString()} ETB`}
-          subtext={`${metrics.floorTabsCount} tables currently in service`}
-          icon={Clock}
+          title="Settled Collections Breakdown"
+          value={`${metrics.settledSales.toLocaleString()} ETB`}
+          subtext={`Cash: ${metrics.cashSales.toLocaleString()} • Digital: ${metrics.digitalSales.toLocaleString()} • Credit: ${metrics.creditSales.toLocaleString()}`}
+          icon={CreditCard}
           color="text-purple-700"
           bg="bg-purple-50 border border-purple-100"
-        />
-
-        <StatCard
-          title="Cash Collections"
-          value={`${metrics.cashSales.toLocaleString()} ETB`}
-          subtext={`Digital: ${metrics.digitalSales.toLocaleString()} ETB • Credit: ${metrics.creditSales.toLocaleString()} ETB`}
-          icon={CreditCard}
-          color="text-blue-700"
-          bg="bg-blue-50 border border-blue-100"
         />
       </div>
 
       {/* Filter Toolbar */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Order Status Filter Buttons */}
+          {/* Department Filter Buttons */}
           <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1">
-            <span className="text-[10px] font-extrabold uppercase text-slate-400 px-2">Filter Orders:</span>
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 px-2">Department:</span>
             <button
               type="button"
               onClick={() => setDepartmentFilter("all")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                 departmentFilter === "all"
                   ? "bg-slate-900 text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              All Orders ({salesRecords.length})
+              <Building2 className="h-3.5 w-3.5" />
+              Whole Hotel ({salesRecords.length})
             </button>
             <button
               type="button"
-              onClick={() => setDepartmentFilter("settled")}
+              onClick={() => setDepartmentFilter("rooms")}
               className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                departmentFilter === "settled"
+                departmentFilter === "rooms"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <BedDouble className="h-3.5 w-3.5" />
+              Rooms & Suites ({salesRecords.filter((r) => r.deptKey === "rooms").length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDepartmentFilter("pos")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                departmentFilter === "pos"
                   ? "bg-emerald-600 text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Settled / Paid ({salesRecords.filter((r) => r.isSettled).length})
+              <UtensilsCrossed className="h-3.5 w-3.5" />
+              Restaurant, Cafe & Bar ({salesRecords.filter((r) => r.deptKey === "pos").length})
+            </button>
+          </div>
+
+          {/* Settlement Status Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 px-2">Status:</span>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                statusFilter === "all" ? "bg-slate-800 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All Status
             </button>
             <button
               type="button"
-              onClick={() => setDepartmentFilter("open_tabs")}
-              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                departmentFilter === "open_tabs"
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+              onClick={() => setStatusFilter("settled")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                statusFilter === "settled" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <Clock className="h-3.5 w-3.5" />
-              Active Floor Tabs ({salesRecords.filter((r) => !r.isSettled).length})
+              <CheckCircle2 className="h-3 w-3" />
+              Settled / Paid
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("open_tabs")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                statusFilter === "open_tabs" ? "bg-amber-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Clock className="h-3 w-3" />
+              Pending / Floor Tabs
             </button>
           </div>
 
@@ -626,7 +748,7 @@ function FinanceSalesPage() {
       <div id="finance-sales-printable-area" className="hidden print:block p-8 bg-white text-slate-900">
         <div className="border-b-2 border-slate-900 pb-4 text-center">
           <h1 className="text-2xl font-black uppercase tracking-tight">KASINA HOTEL & SUITES</h1>
-          <p className="text-xs text-slate-600 font-medium">Restaurant & Bar POS Sales Audit Ledger</p>
+          <p className="text-xs text-slate-600 font-medium">Whole-Hotel Master Sales & Revenue Audit Ledger</p>
           <p className="mt-1 text-[11px] text-slate-500">
             Period: {startDate || "All Time"} to {endDate || "All Time"} • Filter: {departmentFilter.toUpperCase()} • Generated: {new Date().toLocaleString()}
           </p>
@@ -634,24 +756,24 @@ function FinanceSalesPage() {
 
         <div className="my-6 grid grid-cols-4 gap-4 border border-slate-200 p-4 text-xs">
           <div>
-            <span className="text-slate-500 block">Total Order Volume</span>
+            <span className="text-slate-500 block">Total Hotel Revenue</span>
             <span className="font-bold text-base">{metrics.totalGrossVolume.toLocaleString()} ETB</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">{metrics.totalCount} orders total</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{metrics.totalCount} transactions total</span>
           </div>
           <div>
-            <span className="text-slate-500 block">Settled / Paid</span>
-            <span className="font-bold text-base">{metrics.settledSales.toLocaleString()} ETB</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">{metrics.settledCount} paid orders</span>
+            <span className="text-slate-500 block">Rooms Lodging</span>
+            <span className="font-bold text-base text-blue-700">{metrics.roomSales.toLocaleString()} ETB</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{metrics.roomCount} guest bookings</span>
           </div>
           <div>
-            <span className="text-slate-500 block">Open Floor Tabs</span>
-            <span className="font-bold text-base">{metrics.floorTabsRevenue.toLocaleString()} ETB</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">{metrics.floorTabsCount} in service</span>
+            <span className="text-slate-500 block">Restaurant & Bar POS</span>
+            <span className="font-bold text-base text-emerald-700">{metrics.posSales.toLocaleString()} ETB</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{metrics.posCount} orders</span>
           </div>
           <div>
-            <span className="text-slate-500 block">Cash Collected</span>
-            <span className="font-bold text-base">{metrics.cashSales.toLocaleString()} ETB</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Digital: {metrics.digitalSales.toLocaleString()} ETB</span>
+            <span className="text-slate-500 block">Settled Collections</span>
+            <span className="font-bold text-base text-purple-700">{metrics.settledSales.toLocaleString()} ETB</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">Cash: {metrics.cashSales.toLocaleString()} ETB</span>
           </div>
         </div>
 
@@ -747,7 +869,9 @@ function FinanceSalesPage() {
                     </div>
                     <div>
                       <span className="text-slate-400 block">Settlement Status:</span>
-                      <span className="font-bold text-emerald-700 uppercase">100% Paid</span>
+                      <span className={`font-bold uppercase ${selectedRecord.isSettled ? "text-emerald-700" : "text-amber-700"}`}>
+                        {selectedRecord.isSettled ? "Settled / Paid" : "Pending Payment"}
+                      </span>
                     </div>
                   </div>
 

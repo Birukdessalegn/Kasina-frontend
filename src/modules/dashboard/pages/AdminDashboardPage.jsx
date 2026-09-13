@@ -52,6 +52,7 @@ export default function AdminDashboardPage() {
   const [vipPaymentsList, setVipPaymentsList] = useState([]);
   const [roomReservations, setRoomReservations] = useState([]);
   const [multiLocationStock, setMultiLocationStock] = useState([]);
+  const [purchases, setPurchases] = useState([]);
 
   // Table Radar Filter & Work Journey Timeframe
   const [tableFilter, setTableFilter] = useState("all"); // "all" | "occupied" | "unpaid" | "available"
@@ -71,7 +72,7 @@ export default function AdminDashboardPage() {
       else setIsRefreshing(true);
       setError("");
 
-      const [dashRes, tablesRes, ordersRes, empRes, prodRes, kitchenRes, barRes, expRes, vipRes, pmtsRes, multiStockRes, roomsRes] = await Promise.all([
+      const [dashRes, tablesRes, ordersRes, empRes, prodRes, kitchenRes, barRes, expRes, vipRes, pmtsRes, multiStockRes, roomsRes, purRes] = await Promise.all([
         api("/dashboard").catch(() => ({})),
         api("/tables").catch(() => api("/pos/tables").catch(() => ({}))),
         api("/pos/orders").catch(() => api("/orders").catch(() => ({}))),
@@ -83,8 +84,13 @@ export default function AdminDashboardPage() {
         api("/vip-customers").catch(() => api("/customers/vip").catch(() => ([]))),
         api("/payments").catch(() => ([])),
         api("/inventory/multi-location").catch(() => ({})),
-        api("/room-reservations").catch(() => api("/rooms/reservations").catch(() => ([]))),
+        api("/room-reservations").catch(() => ({ data: [] })),
+        api("/purchasing").catch(() => ({ purchases: [] })),
       ]);
+
+      if (purRes) {
+        setPurchases(Array.isArray(purRes) ? purRes : purRes.purchases || purRes.data || []);
+      }
 
       if (roomsRes) {
         setRoomReservations(roomsRes.reservations || roomsRes.data || (Array.isArray(roomsRes) ? roomsRes : []));
@@ -472,21 +478,22 @@ export default function AdminDashboardPage() {
       ? (lifetimeOrdersTax > 0 ? lifetimeOrdersTax : Number(dashboardStats?.total_tax || 0))
       : (todayOrdersTax > 0 ? todayOrdersTax : Number(dashboardStats?.today_tax || 0));
 
-    // Financial Tax & Net Earnings: Derived from real database tax or subtotal
+    const totalPurchases = (purchases || []).reduce((sum, p) => sum + Number(p.total_amount || p.total || 0), 0);
+    const totalOutflow = lifetimeExpenses + totalPurchases;
+    const activeOutflow = timeframe === "lifetime" ? totalOutflow : todayExpenses;
+
+    // Financial Tax & Net Earnings: Calculated identically to Finance P&L
     let totalVatTax = 0;
     let totalServiceCharge = 0;
 
-    if (activeDbTax > 0) {
-      totalVatTax = Math.round((activeDbTax * 0.60) * 100) / 100;
-      totalServiceCharge = Math.round((activeDbTax * 0.40) * 100) / 100;
-    } else if (activeGrossRevenue > 0) {
+    if (activeGrossRevenue > 0) {
       const calculatedSubtotal = activeGrossRevenue / 1.25;
       totalVatTax = Math.round(calculatedSubtotal * 0.15 * 100) / 100;
       totalServiceCharge = Math.round(calculatedSubtotal * 0.10 * 100) / 100;
     }
 
-    const netRevenue = Math.max(activeGrossRevenue - totalVatTax - totalServiceCharge - activeExpenses, 0);
-    const lifetimeNetRevenue = Math.max(lifetimeGrossRevenue - (lifetimeOrdersTax > 0 ? lifetimeOrdersTax : Math.round(lifetimeGrossRevenue * 0.25)) - lifetimeExpenses, 0);
+    const netRevenue = Math.max(activeGrossRevenue - totalVatTax - totalServiceCharge - activeOutflow, 0);
+    const lifetimeNetRevenue = Math.max(lifetimeGrossRevenue - Math.round((lifetimeGrossRevenue / 1.25) * 0.25 * 100) / 100 - totalOutflow, 0);
 
     return {
       totalTablesCount,
@@ -508,15 +515,15 @@ export default function AdminDashboardPage() {
       activeRoomsCount,
       totalVatTax,
       totalServiceCharge,
-      totalExpenses: activeExpenses,
+      totalExpenses: activeOutflow,
       todayExpenses,
-      lifetimeExpenses,
+      lifetimeExpenses: totalOutflow,
       netRevenue,
       lifetimeNetRevenue,
       completedOrders,
       activeStaffCount,
     };
-  }, [tableRadarData, dashboardStats, orders, payments, roomReservations, employees, expenses, timeframe]);
+  }, [tableRadarData, dashboardStats, orders, payments, roomReservations, employees, expenses, purchases, timeframe]);
 
   // Filtered Table Radar List
   const filteredRadarTables = useMemo(() => {
@@ -1148,7 +1155,7 @@ export default function AdminDashboardPage() {
                   ALL HOTEL FIELDS ACTIVE
                 </span>
                 <span className="text-xs font-bold text-slate-300">
-                  Live Database Aggregator
+                  Consolidated Revenue Summary
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
@@ -1174,10 +1181,10 @@ export default function AdminDashboardPage() {
               <span className="text-slate-300 font-medium">Floor Tabs:</span>
               <span className="font-black text-amber-300 font-mono">{formatMoney(metrics.totalUnpaidPendingMoney)}</span>
             </div>
-            <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 px-3 py-1.5 shadow-2xs">
-              <TrendingUp className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-amber-200 font-medium">Total Pipeline:</span>
-              <span className="font-black text-amber-300 font-mono">{formatMoney(metrics.totalHotelBusinessVolume)}</span>
+            <div className="flex items-center gap-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 px-3 py-1.5 shadow-2xs">
+              <CreditCard className="h-3.5 w-3.5 text-purple-300" />
+              <span className="text-purple-200 font-medium">Paid Collections:</span>
+              <span className="font-black text-purple-300 font-mono">{formatMoney(metrics.lifetimeGrossRevenue)}</span>
             </div>
           </div>
         </div>

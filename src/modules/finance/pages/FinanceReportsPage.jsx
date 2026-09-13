@@ -52,6 +52,7 @@ function FinanceReportsPage() {
   const [roomReservations, setRoomReservations] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -66,22 +67,25 @@ function FinanceReportsPage() {
       setError(null);
 
       // Fetch all financial data streams in parallel across whole hotel
-      const [posRes, roomsRes, expensesRes, purchasesRes] = await Promise.all([
+      const [posRes, roomsRes, expensesRes, purchasesRes, paymentsRes] = await Promise.all([
         api("/pos/orders").catch(() => api("/orders").catch(() => ({ orders: [] }))),
-        api("/room-reservations").catch(() => api("/rooms/reservations").catch(() => ([]))),
+        api("/room-reservations").catch(() => ({ data: [] })),
         api("/expenses").catch(() => []),
         api("/purchasing").catch(() => ({ purchases: [] })),
+        api("/payments").catch(() => ([])),
       ]);
 
       const posList = posRes.orders || posRes.data || (Array.isArray(posRes) ? posRes : []);
       const roomsList = roomsRes.reservations || roomsRes.data || (Array.isArray(roomsRes) ? roomsRes : []);
       const expList = Array.isArray(expensesRes) ? expensesRes : expensesRes.expenses || expensesRes.data || [];
       const purList = purchasesRes.purchases || purchasesRes.data || (Array.isArray(purchasesRes) ? purchasesRes : []);
+      const pmtsList = paymentsRes.payments || paymentsRes.data || (Array.isArray(paymentsRes) ? paymentsRes : []);
 
       setOrders(posList);
       setRoomReservations(roomsList);
       setExpenses(expList);
       setPurchases(purList);
+      setPayments(pmtsList);
     } catch (err) {
       console.error("Failed to fetch financial report data:", err);
       setError(err.message || "Failed to load financial records");
@@ -98,14 +102,15 @@ function FinanceReportsPage() {
   const ledgerTransactions = useMemo(() => {
     const stream = [];
 
-    // 1. Hotel Room Lodging Income
+    // 1. Hotel Room Lodging Income (Strictly actually paid money)
     roomReservations.forEach((r) => {
       const rawDate = r.created_at || r.check_in_date;
       const dateStr = rawDate ? String(rawDate).split(/[T ]/)[0] : "";
       const timeStr = rawDate ? new Date(rawDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-";
-      const amt = Number(r.paid_amount || r.total_amount || 0);
+      const paidAmt = Number(r.paid_amount || 0);
+      const amt = paidAmt > 0 ? paidAmt : (r.payment_status === "paid" ? Number(r.total_amount || 0) : 0);
 
-      if (amt > 0 || r.payment_status === "paid") {
+      if (amt > 0) {
         stream.push({
           id: `ROOM-${r.id || r.reservation_code}`,
           type: "Room Revenue",
@@ -123,35 +128,67 @@ function FinanceReportsPage() {
       }
     });
 
-    // 2. POS Restaurant & Bar Revenue Transactions
-    orders.forEach((o) => {
-      const rawDate = o.created_at || o.createdAt || o.date;
-      const dateStr = rawDate ? String(rawDate).split(/[T ]/)[0] : "";
-      const timeStr = rawDate ? new Date(rawDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-";
-      const amt = Number(o.total || o.total_amount || o.amount || 0);
-
-      const isPaid = o.payment_status === "paid" || o.status === "completed" || o.status === "served";
-      const isCredit = o.payment_method === "credit" || o.payment_status === "credit_pending";
-
+    // 2. POS Restaurant & Bar Paid Transactions (From verified payments)
+    const paidOrderIds = new Set();
+    payments.forEach((p) => {
+      const amt = Number(p.amount || 0);
       if (amt > 0) {
+        if (p.order_id) paidOrderIds.add(String(p.order_id));
+        const linkedOrder = orders.find((o) => String(o.id) === String(p.order_id));
+        const rawDate = p.paid_at || p.created_at || (linkedOrder && linkedOrder.created_at);
+        const dateStr = rawDate ? String(rawDate).split(/[T ]/)[0] : "";
+        const timeStr = rawDate ? new Date(rawDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-";
+
         stream.push({
-          id: `POS-${o.id || o.order_id}`,
+          id: `PAY-${p.id}`,
           type: "POS Revenue",
           department: "Restaurant & Bar POS",
-          title: `POS Order #${o.id || o.order_id} (${o.table_number ? `Table #${o.table_number}` : "Bar / Takeout"})`,
+          title: p.order_number ? `POS Payment ${p.order_number}` : (linkedOrder?.table_number ? `Table #${linkedOrder.table_number}` : "Bar / Dining Receipt"),
           category: "Food & Beverage Sales",
-          paymentMethod: (o.payment_method || "cash").toLowerCase(),
+          paymentMethod: (p.payment_method || "cash").toLowerCase(),
           amount: amt,
           isIncome: true,
           date: dateStr,
           time: timeStr,
-          status: isPaid ? "Verified" : isCredit ? "Credit Pending" : "Pending",
+          status: "Verified",
+          raw: p,
+        });
+      }
+    });
+
+    // 3. Unpaid Active Floor Tabs (Recorded as Pending)
+    orders.forEach((o) => {
+      const oId = String(o.id || o.order_id);
+      const st = String(o.status || "").toLowerCase();
+      const paySt = String(o.payment_status || "").toLowerCase();
+      const oPayments = payments.filter((p) => String(p.order_id) === oId);
+      const paidSoFar = oPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
+      const orderTotal = Number(o.total || o.total_amount || 0);
+      const unpaidBalance = orderTotal - paidSoFar;
+
+      if (unpaidBalance > 0 && st !== "cancelled" && st !== "void" && paySt !== "paid") {
+        const rawDate = o.created_at || o.createdAt || o.date;
+        const dateStr = rawDate ? String(rawDate).split(/[T ]/)[0] : "";
+        const timeStr = rawDate ? new Date(rawDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-";
+
+        stream.push({
+          id: `TAB-${o.id || o.order_id}`,
+          type: "POS Revenue",
+          department: "Restaurant & Bar POS",
+          title: `Floor Tab (${o.table_number ? `Table #${o.table_number}` : "Dining"})`,
+          category: "Food & Beverage Sales",
+          paymentMethod: (o.payment_method || "unpaid").toLowerCase(),
+          amount: unpaidBalance,
+          isIncome: true,
+          date: dateStr,
+          time: timeStr,
+          status: "Pending",
           raw: o,
         });
       }
     });
 
-    // 3. Operating Expense Transactions
+    // 4. Operating Expense Transactions
     expenses.forEach((e) => {
       const rawDate = e.date || e.created_at || e.createdAt;
       const dateStr = rawDate ? String(rawDate).split(/[T ]/)[0] : "";
@@ -198,7 +235,7 @@ function FinanceReportsPage() {
     });
 
     return stream.sort((a, b) => new Date(b.date + " " + b.time) - new Date(a.date + " " + a.time));
-  }, [roomReservations, orders, expenses, purchases]);
+  }, [roomReservations, orders, expenses, purchases, payments]);
 
   // Filter transactions by date range, search & type
   const filteredLedger = useMemo(() => {

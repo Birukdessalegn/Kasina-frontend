@@ -75,7 +75,7 @@ export default function MasterReportsPage() {
         api("/kitchen").catch(() => []),
         api("/kitchen/orders").catch(() => []),
         api("/products").catch(() => []),
-        api("/room-reservations").catch(() => api("/rooms/reservations").catch(() => [])),
+        api("/room-reservations").catch(() => ({ data: [] })),
       ]);
 
       const rawOrders = ordersRes.orders || ordersRes.data || (Array.isArray(ordersRes) ? ordersRes : []);
