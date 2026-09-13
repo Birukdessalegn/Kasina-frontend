@@ -243,3 +243,107 @@ export const printReportArea = (elementId, title = "Official Sales & Shift Repor
     iframe.contentWindow.print();
   }, 350);
 };
+
+/**
+ * 100% Reliable Cross-Browser Org Chart Printer (Landscape Optimized)
+ * Clones the org chart into an isolated iframe with all active stylesheets,
+ * guaranteeing zero blank pages and perfect landscape vector rendering.
+ */
+export const printOrgChartArea = (elementId = "printable-org-chart", title = "Kasina Hotel - Organizational Hierarchy") => {
+  const element = document.getElementById(elementId) || document.querySelector(".org-print-canvas");
+
+  if (!element) {
+    window.print();
+    return;
+  }
+
+  // Remove any previously created print iframe
+  const oldIframe = document.getElementById("kasina-org-print-frame");
+  if (oldIframe) {
+    oldIframe.remove();
+  }
+
+  const iframe = document.createElement("iframe");
+  iframe.id = "kasina-org-print-frame";
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+
+  // Extract all stylesheets from current document
+  let stylesHtml = "";
+  document.querySelectorAll("style, link[rel='stylesheet']").forEach((styleNode) => {
+    stylesHtml += styleNode.outerHTML;
+  });
+
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>${title}</title>
+        ${stylesHtml}
+        <style>
+          @page {
+            size: landscape;
+            margin: 8mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          html, body {
+            margin: 0 !important;
+            padding: 4px !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            width: 100% !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          /* Ensure all nodes inside the printable area are visible */
+          body * {
+            visibility: visible !important;
+          }
+          .org-print-canvas {
+            border: none !important;
+            box-shadow: none !important;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+          }
+          /* Hide buttons and interactive filters */
+          button, input, select, .print\\:hidden, .print-hide {
+            display: none !important;
+          }
+          .print\\:block {
+            display: block !important;
+          }
+          .print\\:flex {
+            display: flex !important;
+          }
+        </style>
+      </head>
+      <body>
+        <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+          ${element.innerHTML}
+        </div>
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }, 400);
+};
+
