@@ -4,26 +4,39 @@ import {
   ChefHat,
   BarChart3,
   X,
+  Coffee,
+  UtensilsCrossed,
+  Flame,
 } from "lucide-react";
-
+import { useAuth } from "../context/AuthContext";
 import AppHeader from "../layouts/AppHeader";
 
-const menuItems = [
-  {
-    name: "Kitchen Dashboard",
-    path: "/kitchen",
-    icon: ChefHat,
-  },
-  {
-    name: "Reports",
-    path: "/kitchen/reports",
-    icon: BarChart3,
-  },
-];
-
 function KitchenLayout() {
+  const { user } = useAuth();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const role = String(user?.role || "").toLowerCase();
+
+  let menuItems = [];
+  if (role === "cafe_chef" || role === "cafe_supervisor") {
+    menuItems = [
+      { name: "Cafe Kitchen (KDS)", path: "/kitchen/cafe", icon: Coffee },
+      { name: "Kitchen Reports", path: "/kitchen/reports", icon: BarChart3 },
+    ];
+  } else if (role === "chef" || role === "bar_restaurant_supervisor") {
+    menuItems = [
+      { name: "Restaurant Kitchen (KDS)", path: "/kitchen/restaurant", icon: UtensilsCrossed },
+      { name: "Kitchen Reports", path: "/kitchen/reports", icon: BarChart3 },
+    ];
+  } else {
+    menuItems = [
+      { name: "Cafe Kitchen", path: "/kitchen/cafe", icon: Coffee },
+      { name: "Restaurant Kitchen", path: "/kitchen/restaurant", icon: UtensilsCrossed },
+      { name: "Master Display (All)", path: "/kitchen", icon: Flame },
+      { name: "Kitchen Reports", path: "/kitchen/reports", icon: BarChart3 },
+    ];
+  }
 
   const isReportsPage = location.pathname === "/kitchen/reports";
 

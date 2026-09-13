@@ -44,6 +44,8 @@ function DashboardRoleSwitch() {
 }
 
 import KitchenPage from "../modules/kitchen/pages/KitchenPage";
+import CafeKitchenPage from "../modules/kitchen/pages/CafeKitchenPage";
+import RestaurantKitchenPage from "../modules/kitchen/pages/RestaurantKitchenPage";
 import KitchenLiveAssetsPage from "../modules/kitchen/pages/KitchenLiveAssetsPage";
 import KitchenStockAuditPage from "../modules/kitchen/pages/KitchenStockAuditPage";
 import FBAuditReportsPage from "../modules/kitchen/pages/FBAuditReportsPage";
@@ -225,6 +227,14 @@ function AppRoutes() {
               <Route
                 path="/kitchen"
                 element={<KitchenPage />}
+              />
+              <Route
+                path="/kitchen/cafe"
+                element={<CafeKitchenPage />}
+              />
+              <Route
+                path="/kitchen/restaurant"
+                element={<RestaurantKitchenPage />}
               />
 
               <Route
@@ -528,6 +538,14 @@ function AppRoutes() {
               <Route
                 path="/chef/kitchen"
                 element={<KitchenPage />}
+              />
+              <Route
+                path="/chef/kitchen/cafe"
+                element={<CafeKitchenPage />}
+              />
+              <Route
+                path="/chef/kitchen/restaurant"
+                element={<RestaurantKitchenPage />}
               />
 
               <Route

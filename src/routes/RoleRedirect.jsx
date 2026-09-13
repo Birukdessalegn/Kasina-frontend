@@ -11,8 +11,12 @@ function RoleRedirect() {
   const role = user.role?.toUpperCase();
 
   switch (role) {
-    case "CHEF":
     case "CAFE_CHEF":
+      return <Navigate to="/kitchen/cafe" replace />;
+
+    case "CHEF":
+      return <Navigate to="/kitchen/restaurant" replace />;
+
     case "KITCHEN_MANAGER":
       return <Navigate to="/kitchen" replace />;
 

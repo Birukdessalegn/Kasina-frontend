@@ -51,6 +51,7 @@ import {
   History,
   Sparkles,
   DollarSign,
+  Coffee,
 } from "lucide-react";
 
 /* =========================================================
@@ -184,7 +185,17 @@ const navigationGroups = [
 
         children: [
           {
-            name: "Kitchen Display (KDS)",
+            name: "Cafe Kitchen (KDS)",
+            path: "/kitchen/cafe",
+            icon: Coffee,
+          },
+          {
+            name: "Restaurant Kitchen (KDS)",
+            path: "/kitchen/restaurant",
+            icon: UtensilsCrossed,
+          },
+          {
+            name: "Kitchen Master (All)",
             path: "/kitchen",
             icon: Flame,
           },
