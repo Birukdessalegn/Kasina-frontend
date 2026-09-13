@@ -1553,7 +1553,7 @@ function ProductsPage() {
                       <option value="plate">Plate (Main dishes / Food meals)</option>
                       <option value="portion">Portion (Salads / Appetizers / Sides)</option>
                       <option value="bowl">Bowl (Soups / Stews)</option>
-                      <option value="pcs">Pieces / pcs (Burgers / Sambusa / Shisha)</option>
+                      <option value="pcs">Pieces / pcs (Burgers / Sambusa / Pastries)</option>
                     </optgroup>
 
                     <optgroup label="🍸 Bar & Beverage Servings">

@@ -196,12 +196,15 @@
   #printable-report,
   #printable-report *,
   #printable-org-chart,
-  #printable-org-chart * {
+  #printable-org-chart *,
+  #printable-payslip,
+  #printable-payslip * {
     visibility: visible !important;
   }
 
   #printable-report,
-  #printable-org-chart {
+  #printable-org-chart,
+  #printable-payslip {
     position: absolute;
     left: 0;
     top: 0;

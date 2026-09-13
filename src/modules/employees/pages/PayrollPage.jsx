@@ -172,7 +172,7 @@ function PayrollPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-slate-400">Absence Deductions</span>
+            <span className="text-xs font-bold uppercase text-slate-400">Total Deductions</span>
             <div className="rounded-xl bg-rose-50 p-2 text-rose-600">
               <TrendingDown className="h-5 w-5" />
             </div>
@@ -180,7 +180,7 @@ function PayrollPage() {
           <p className="mt-2 text-2xl font-black text-rose-600">
             -{stats.totalDeductions.toLocaleString()} ETB
           </p>
-          <p className="text-xs text-slate-500 mt-1">Calculated from attendance log</p>
+          <p className="text-xs text-slate-500 mt-1">Pension (7%) + Income Tax</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-xs">
