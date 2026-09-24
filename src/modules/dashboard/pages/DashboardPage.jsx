@@ -17,14 +17,16 @@ import {
   BedDouble,
 } from "lucide-react";
 import api from "../../../services/api";
+import SmoothMonthlyRevenueChart from "../components/SmoothMonthlyRevenueChart";
 
 export default function DashboardPage() {
   const [dashboard, setDashboard] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [chartTimeframe, setChartTimeframe] = useState("week"); // "week" | "month" | "category"
-  const [hoveredBar, setHoveredBar] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // ============================================================
@@ -40,28 +42,33 @@ export default function DashboardPage() {
       }
       setError("");
 
-      const response = await api("/dashboard");
+      const [response, ordersRes, expRes, roomsRes] = await Promise.all([
+        api("/dashboard").catch((err) => ({ success: false, message: err.message })),
+        api("/pos/orders").catch(() => api("/orders").catch(() => ({}))),
+        api("/expenses").catch(() => ({})),
+        api("/frontdesk/reservations").catch(() => api("/reservations").catch(() => ({}))),
+      ]);
 
       console.log("Dashboard live response:", response);
 
-      if (response.success) {
+      const ordersList = ordersRes.orders || ordersRes.data || (Array.isArray(ordersRes) ? ordersRes : []);
+      setOrders(ordersList);
+
+      const expensesList = expRes.expenses || expRes.data || (Array.isArray(expRes) ? expRes : []);
+      setExpenses(expensesList);
+
+      const reservationsList = roomsRes.reservations || roomsRes.data || (Array.isArray(roomsRes) ? roomsRes : []);
+      setReservations(reservationsList);
+
+      if (response && response.success !== false) {
         const statsData = response.stats || response.data || response;
 
         let topProds = response.top_products || statsData.top_products || response.topProducts || [];
 
         // If top_products is empty or missing quantity_sold, fetch catalog & real sold orders
         try {
-          const prodRes = await api("/products");
+          const prodRes = await api("/products").catch(() => ({}));
           const productsList = prodRes.products || prodRes.data || [];
-
-          // Also fetch real orders list to aggregate actual sold quantities
-          let ordersList = [];
-          try {
-            const ordersRes = await api("/pos/orders").catch(() => api("/orders").catch(() => ({})));
-            ordersList = ordersRes.orders || ordersRes.data || (Array.isArray(ordersRes) ? ordersRes : []);
-          } catch (oe) {
-            console.log("Orders fetch check:", oe);
-          }
 
           // Aggregate sales by product_id from completed/paid orders
           const salesMap = {};
@@ -171,71 +178,67 @@ export default function DashboardPage() {
   };
 
   // ============================================================
-  // CHART DATA GENERATION (STRICTLY FROM POS ORDERS DATABASE)
+  // HOTEL REVENUE & PROFIT METRICS
   // ============================================================
 
-  const chartData = useMemo(() => {
-    // 1. Direct POS orders sales chart from backend database orders table
-    if (dashboard?.sales_chart && Array.isArray(dashboard.sales_chart) && dashboard.sales_chart.length > 0) {
-      const maxVal = Math.max(...dashboard.sales_chart.map((d) => Number(d.sales || d.total || 0)));
+  const metrics = useMemo(() => {
+    const paidOrders = (orders || []).filter((ord) => {
+      const st = String(ord.status || "").toLowerCase();
+      const paySt = String(ord.payment_status || "").toLowerCase();
+      return (
+        st === "completed" ||
+        st === "paid" ||
+        paySt === "paid" ||
+        ord.is_paid === true
+      );
+    });
 
-      return dashboard.sales_chart.map((d) => {
-        const dateObj = new Date(d.date);
-        const dayLabel = isNaN(dateObj.getTime())
-          ? d.date || "Day"
-          : dateObj.toLocaleDateString("en-US", { weekday: "short" });
+    const posPaidTotal = paidOrders.reduce((sum, o) => {
+      return sum + Number(o.total_amount || o.total || o.grand_total || 0);
+    }, 0);
 
-        const salesVal = Number(d.sales || d.total || 0);
-        const countVal = Number(d.orders_count || d.payment_count || d.orders || d.count || 1);
+    const posSalesAllTime = Math.max(
+      posPaidTotal,
+      Number(
+        dashboard?.all_time_sales ||
+        dashboard?.total_sales ||
+        dashboard?.total_revenue ||
+        0
+      )
+    );
 
-        return {
-          label: dayLabel,
-          sales: salesVal,
-          orders: countVal,
-          isPeak: salesVal > 0 && salesVal === maxVal,
-        };
-      });
-    }
+    const roomPaidTotal = (reservations || []).reduce((sum, r) => {
+      return sum + Number(r.paid_amount || r.total_amount || 0);
+    }, 0);
 
-    // 2. Direct POS category breakdown from database
-    if (chartTimeframe === "category" && dashboard?.category_sales && Array.isArray(dashboard.category_sales)) {
-      return dashboard.category_sales.map((c) => ({
-        label: c.name || c.label,
-        sales: Number(c.sales || c.revenue || 0),
-        orders: Number(c.orders || c.count || 0),
-      }));
-    }
+    const roomSalesAllTime = Math.max(
+      roomPaidTotal,
+      Number(dashboard?.room_sales_all_time || 0)
+    );
 
-    // 3. Live POS Today's Sales
-    const todaySales = Number(dashboard?.today_sales || 0);
-    const todayOrders = Number(dashboard?.today_orders || 0);
+    const grossRevenue = Math.max(
+      posSalesAllTime + roomSalesAllTime,
+      Number(
+        dashboard?.grand_total_revenue ||
+        dashboard?.total_revenue ||
+        dashboard?.today_sales ||
+        0
+      )
+    );
 
-    if (todaySales > 0 || todayOrders > 0) {
-      return [
-        { label: "Today (POS)", sales: todaySales, orders: todayOrders, isPeak: true },
-      ];
-    }
+    const totalExpenses =
+      (expenses || []).reduce((sum, e) => {
+        return sum + Number(e.amount || 0);
+      }, 0) || Number(dashboard?.total_expenses || 0);
 
-    return [];
-  }, [dashboard, chartTimeframe]);
+    const netRevenue = Math.max(grossRevenue - totalExpenses, 0);
 
-  const maxSales = useMemo(() => {
-    return Math.max(...chartData.map((d) => d.sales), 1000);
-  }, [chartData]);
-
-  const totalChartRevenue = useMemo(() => {
-    return chartData.reduce((acc, curr) => acc + curr.sales, 0);
-  }, [chartData]);
-
-  const peakDayLabel = useMemo(() => {
-    const peak = chartData.find((d) => d.isPeak && d.sales > 0);
-    return peak ? `${peak.label} (${formatMoney(peak.sales)})` : "No peak yet";
-  }, [chartData]);
-
-  const avgDailyRevenue = useMemo(() => {
-    if (!chartData.length) return 0;
-    return Math.round(totalChartRevenue / chartData.length);
-  }, [totalChartRevenue, chartData]);
+    return {
+      grossRevenue,
+      totalExpenses,
+      netRevenue,
+    };
+  }, [orders, expenses, reservations, dashboard]);
 
   const totalItemsServed = useMemo(() => {
     if (!dashboard?.top_products || !Array.isArray(dashboard.top_products)) return 0;
@@ -602,151 +605,17 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ====================================================
-            STYLISH BAR CHART
+            SMOOTH WAVE REVENUE LINE CHART (RESTOBOARD STYLE)
         ==================================================== */}
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm lg:col-span-2">
-          {/* Header & Controls */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                  <BarChart3 className="h-4 w-4" />
-                </div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  Revenue Analytics
-                </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                  <TrendingUp className="h-3 w-3" />
-                  Live Sync
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Total Period Revenue:{" "}
-                <span className="font-bold text-slate-900">
-                  {formatMoney(totalChartRevenue)}
-                </span>
-              </p>
-            </div>
-
-            {/* Timeframe Selector Buttons */}
-            <div className="flex flex-wrap items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setChartTimeframe("week")}
-                className={`rounded-lg px-3 py-1.5 transition ${chartTimeframe === "week"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                Weekly
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setChartTimeframe("month")}
-                className={`rounded-lg px-3 py-1.5 transition ${chartTimeframe === "month"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                Monthly
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setChartTimeframe("category")}
-                className={`rounded-lg px-3 py-1.5 transition ${chartTimeframe === "category"
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                  }`}
-              >
-                Category
-              </button>
-            </div>
-          </div>
-
-          {/* BAR CHART GRAPH AREA */}
-          <div className="mt-6 sm:mt-8 overflow-x-auto">
-            <div className="relative flex h-64 min-w-[320px] items-end gap-2 sm:gap-3 rounded-xl border border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-3 sm:p-4">
-              {/* Background Grid Lines */}
-              <div className="absolute inset-x-0 top-0 bottom-8 flex flex-col justify-between pointer-events-none px-4 opacity-40">
-                <div className="border-b border-dashed border-slate-200 w-full" />
-                <div className="border-b border-dashed border-slate-200 w-full" />
-                <div className="border-b border-dashed border-slate-200 w-full" />
-                <div className="border-b border-dashed border-slate-200 w-full" />
-              </div>
-
-              {/* BARS */}
-              {chartData.map((item, index) => {
-                const heightPercent = Math.max(
-                  Math.round((item.sales / maxSales) * 100),
-                  12
-                );
-
-                const isHovered = hoveredBar === index;
-
-                return (
-                  <div
-                    key={item.label}
-                    onMouseEnter={() => setHoveredBar(index)}
-                    onMouseLeave={() => setHoveredBar(null)}
-                    className="relative flex flex-1 flex-col items-center h-full justify-end group cursor-pointer"
-                  >
-                    {/* Tooltip on Hover */}
-                    {isHovered && (
-                      <div className="absolute -top-14 z-20 flex flex-col items-center rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white shadow-xl animate-in fade-in duration-150">
-                        <span className="font-bold text-amber-400">
-                          {formatMoney(item.sales)}
-                        </span>
-                        <span className="text-[10px] text-slate-300">
-                          {item.orders} Orders
-                        </span>
-                        <div className="absolute -bottom-1 h-2 w-2 rotate-45 bg-slate-900" />
-                      </div>
-                    )}
-
-                    {/* Bar Pillar with Gradient */}
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      className={`w-full max-w-[48px] rounded-t-xl transition-all duration-300 relative overflow-hidden ${item.isPeak
-                          ? "bg-gradient-to-t from-indigo-600 via-blue-500 to-indigo-400 shadow-md shadow-indigo-500/30"
-                          : isHovered
-                            ? "bg-gradient-to-t from-indigo-700 to-blue-500 shadow-lg shadow-indigo-500/40 scale-105"
-                            : "bg-gradient-to-t from-slate-700 via-indigo-600 to-blue-500 opacity-90 group-hover:opacity-100"
-                        }`}
-                    >
-                      {/* Top Bar Glow Line */}
-                      <div className="h-1 w-full bg-white/40" />
-                    </div>
-
-                    {/* X-Axis Label */}
-                    <span
-                      className={`mt-3 text-xs font-semibold transition ${isHovered
-                          ? "text-indigo-600 font-bold"
-                          : "text-slate-500"
-                        }`}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Footer Stats Summary */}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
-              <span>Highest Revenue Day: <strong className="text-slate-800">{peakDayLabel}</strong></span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>Avg Daily Revenue: <strong className="text-slate-800">{formatMoney(avgDailyRevenue)}</strong></span>
-            </div>
-          </div>
+        <div className="lg:col-span-2">
+          <SmoothMonthlyRevenueChart
+            dashboardStats={dashboard}
+            orders={orders}
+            expenses={expenses}
+            metrics={metrics}
+            formatMoney={formatMoney}
+          />
         </div>
 
         {/* ====================================================
