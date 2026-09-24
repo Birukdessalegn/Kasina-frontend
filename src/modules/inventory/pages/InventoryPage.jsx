@@ -458,15 +458,15 @@ function InventoryPage() {
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Link
-              to="/inventory/transactions"
+              to="/inventory/reports"
               className="flex items-center gap-3 rounded-xl border border-slate-100 bg-blue-50/60 p-4 transition hover:bg-blue-100/60"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
-                <Boxes className="h-5 w-5" />
+                <BarChart3 className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900">Stock Movements</p>
-                <p className="text-xs text-slate-500">View transfers & adjustments</p>
+                <p className="text-sm font-bold text-slate-900">Inventory Reports</p>
+                <p className="text-xs text-slate-500">Audit logs & stock valuation</p>
               </div>
             </Link>
 

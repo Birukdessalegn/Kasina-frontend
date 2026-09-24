@@ -48,7 +48,6 @@ import BarPage from "../modules/bar/pages/BarPage";
 
 import InventoryPage from "../modules/inventory/pages/InventoryPage";
 import InventoryLowStockPage from "../modules/inventory/pages/InventoryLowStockPage";
-import InventoryTransactionsPage from "../modules/inventory/pages/InventoryTransactionsPage";
 import InventoryReportsPage from "../modules/inventory/pages/InventoryReportsPage";
 import CashierReconciliationPage from "../modules/finance/pages/CashierReconciliationPage";
 import FinanceSalesPage from "../modules/finance/pages/FinanceSalesPage";
@@ -346,7 +345,7 @@ function AppRoutes() {
 
               <Route
                 path="/inventory/transactions"
-                element={<InventoryTransactionsPage />}
+                element={<Navigate to="/inventory" replace />}
               />
 
               <Route
@@ -636,7 +635,7 @@ function AppRoutes() {
 
               <Route
                 path="/store/inventory/transactions"
-                element={<InventoryTransactionsPage />}
+                element={<Navigate to="/store/inventory" replace />}
               />
 
               <Route

@@ -310,11 +310,6 @@ const navigationGroups = [
             icon: AlertTriangle,
           },
           {
-            name: "Stock Movements",
-            path: "/inventory/transactions",
-            icon: ArrowLeftRight,
-          },
-          {
             name: "Inventory Reports",
             path: "/inventory/reports",
             icon: BarChart3,

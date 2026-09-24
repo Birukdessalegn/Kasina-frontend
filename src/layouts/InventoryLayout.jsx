@@ -26,11 +26,6 @@ const menuItems = [
     icon: AlertTriangle,
   },
   {
-    name: "Transactions",
-    path: "/inventory/transactions",
-    icon: ArrowLeftRight,
-  },
-  {
     name: "Reports",
     path: "/inventory/reports",
     icon: BarChart3,
@@ -51,10 +46,6 @@ function InventoryLayout() {
       return "Low Stock";
     }
 
-    if (location.pathname === "/inventory/transactions") {
-      return "Inventory Transactions";
-    }
-
     if (location.pathname === "/inventory/reports") {
       return "Inventory Reports";
     }
@@ -69,10 +60,6 @@ function InventoryLayout() {
 
     if (location.pathname === "/inventory/low-stock") {
       return "Monitor items that need to be restocked.";
-    }
-
-    if (location.pathname === "/inventory/transactions") {
-      return "Track all inventory movements.";
     }
 
     if (location.pathname === "/inventory/reports") {
