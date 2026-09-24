@@ -273,24 +273,24 @@ export default function ReservationsListPage() {
       let uploadedBackUrl = null;
       if (idUpdateForm.id_image_file || idUpdateForm.id_image_back_file) {
         try {
-          const uploadRes = await uploadGuestIdImage(
-            resId,
+          const sRes = await uploadStandaloneGuestId(
             idUpdateForm.id_image_file,
             idUpdateForm.id_image_back_file
           );
-          uploadedFrontUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
-          uploadedBackUrl = uploadRes.backImageUrl || uploadRes.data?.id_image_back_url;
-        } catch (uploadErr) {
-          console.warn("Upload via multipart failed, trying standalone:", uploadErr);
+          uploadedFrontUrl = sRes.imageUrl || sRes.frontImageUrl;
+          uploadedBackUrl = sRes.backImageUrl;
+        } catch (sErr) {
+          console.warn("Standalone upload failed, trying endpoint:", sErr);
           try {
-            const sRes = await uploadStandaloneGuestId(
+            const uploadRes = await uploadGuestIdImage(
+              resId,
               idUpdateForm.id_image_file,
               idUpdateForm.id_image_back_file
             );
-            uploadedFrontUrl = sRes.imageUrl || sRes.frontImageUrl;
-            uploadedBackUrl = sRes.backImageUrl;
-          } catch (sErr) {
-            console.warn("Standalone upload failed:", sErr);
+            uploadedFrontUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+            uploadedBackUrl = uploadRes.backImageUrl || uploadRes.data?.id_image_back_url;
+          } catch (uploadErr) {
+            console.warn("Fallback multipart upload failed:", uploadErr);
           }
         }
       }

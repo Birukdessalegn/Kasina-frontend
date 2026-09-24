@@ -370,30 +370,30 @@ export default function FrontDeskPage() {
       let uploadedBackUrl = null;
       if (idUpdateForm.id_image_file || idUpdateForm.id_image_back_file) {
         try {
-          const uploadRes = await uploadGuestIdImage(
-            resId,
+          const sRes = await uploadStandaloneGuestId(
             idUpdateForm.id_image_file,
             idUpdateForm.id_image_back_file
           );
-          uploadedFrontUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
-          uploadedBackUrl = uploadRes.backImageUrl || uploadRes.data?.id_image_back_url;
-        } catch (uploadErr) {
-          console.warn("Upload via multipart failed, trying standalone:", uploadErr);
+          uploadedFrontUrl = sRes.imageUrl || sRes.frontImageUrl;
+          uploadedBackUrl = sRes.backImageUrl;
+        } catch (sErr) {
+          console.warn("Standalone upload failed, trying endpoint:", sErr);
           try {
-            const sRes = await uploadStandaloneGuestId(
+            const uploadRes = await uploadGuestIdImage(
+              resId,
               idUpdateForm.id_image_file,
               idUpdateForm.id_image_back_file
             );
-            uploadedFrontUrl = sRes.imageUrl || sRes.frontImageUrl;
-            uploadedBackUrl = sRes.backImageUrl;
-          } catch (sErr) {
-            console.warn("Standalone upload failed:", sErr);
+            uploadedFrontUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+            uploadedBackUrl = uploadRes.backImageUrl || uploadRes.data?.id_image_back_url;
+          } catch (uploadErr) {
+            console.warn("Fallback multipart upload failed:", uploadErr);
           }
         }
       }
 
       // 2. Update reservation details
-      await updateReservation(resId, {
+      const updatePayload = {
         guest_name: idUpdateForm.guest_name,
         guest_id_number: idUpdateForm.guest_id_number,
         guest_phone: idUpdateForm.guest_phone,
@@ -408,7 +408,18 @@ export default function FrontDeskPage() {
           : idUpdateForm.id_image_back_preview
           ? { id_image_back_url: idUpdateForm.id_image_back_preview }
           : {}),
-      });
+      };
+
+      try {
+        await updateReservation(resId, updatePayload);
+      } catch (updateErr) {
+        if (updateErr.message && updateErr.message.includes("id_image_back_url")) {
+          const { id_image_back_url, ...fallbackPayload } = updatePayload;
+          await updateReservation(resId, fallbackPayload);
+        } else {
+          throw updateErr;
+        }
+      }
 
       showToast("Check-In details and Guest ID updated successfully!");
       setUpdateIdModalOpen(false);
@@ -478,12 +489,24 @@ export default function FrontDeskPage() {
         ...cleanBookingForm
       } = bookingForm;
 
-      const created = await createReservation({
+      const createPayload = {
         ...cleanBookingForm,
         id_image_url: uploadedFrontUrl || (id_image_preview ? id_image_preview : null),
         id_image_back_url: uploadedBackUrl || (id_image_back_preview ? id_image_back_preview : null),
         is_walkin: bookingType === "walkin",
-      });
+      };
+
+      let created;
+      try {
+        created = await createReservation(createPayload);
+      } catch (createErr) {
+        if (createErr.message && createErr.message.includes("id_image_back_url")) {
+          const { id_image_back_url, ...fallbackPayload } = createPayload;
+          created = await createReservation(fallbackPayload);
+        } else {
+          throw createErr;
+        }
+      }
 
       const resId = created?.data?.id;
       if (

@@ -69,19 +69,57 @@ export const getReservations = (params = {}) => {
 
 export const getReservation = (id) => api(`/room-reservations/${id}`);
 
-export const createReservation = (data) =>
-  api("/room-reservations", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+export const createReservation = async (data) => {
+  try {
+    return await api("/room-reservations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    if (data?.id_image_back_url && err?.message && err.message.includes("id_image_back_url")) {
+      console.warn("Remote DB missing id_image_back_url column. Creating reservation with front ID only until migration is applied.");
+      const { id_image_back_url, ...fallbackData } = data;
+      return await api("/room-reservations", {
+        method: "POST",
+        body: JSON.stringify(fallbackData),
+      });
+    }
+    throw err;
+  }
+};
 
-export const updateReservation = (id, data) =>
-  api(`/room-reservations/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
+export const updateReservation = async (id, data) => {
+  try {
+    return await api(`/room-reservations/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    if (data?.id_image_back_url && err?.message && err.message.includes("id_image_back_url")) {
+      console.warn("Remote DB missing id_image_back_url column. Updating reservation with front ID only until migration is applied.");
+      const { id_image_back_url, ...fallbackData } = data;
+      return await api(`/room-reservations/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(fallbackData),
+      });
+    }
+    throw err;
+  }
+};
 
-export const uploadGuestIdImage = (id, frontFile, backFile = null) => {
+export const uploadGuestIdImage = async (id, frontFile, backFile = null) => {
+  // Try standalone upload first if backFile is present to avoid triggering DB column errors
+  if (backFile) {
+    try {
+      const standaloneRes = await uploadStandaloneGuestId(frontFile, backFile);
+      if (standaloneRes && (standaloneRes.imageUrl || standaloneRes.frontImageUrl || standaloneRes.backImageUrl)) {
+        return standaloneRes;
+      }
+    } catch (sErr) {
+      console.warn("Standalone ID upload failed, trying direct endpoint:", sErr);
+    }
+  }
+
   const formData = new FormData();
   if (frontFile) {
     formData.append("id_image_front", frontFile);
@@ -90,10 +128,18 @@ export const uploadGuestIdImage = (id, frontFile, backFile = null) => {
   if (backFile) {
     formData.append("id_image_back", backFile);
   }
-  return api(`/room-reservations/${id}/upload-id`, {
-    method: "POST",
-    body: formData,
-  });
+
+  try {
+    return await api(`/room-reservations/${id}/upload-id`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (err) {
+    if (err.message && err.message.includes("id_image_back_url")) {
+      return await uploadStandaloneGuestId(frontFile, backFile);
+    }
+    throw err;
+  }
 };
 
 export const uploadStandaloneGuestId = (frontFile, backFile = null) => {
