@@ -452,14 +452,14 @@ function TodaySalesAuditPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black tracking-tight text-slate-900">
-              Today's Sales & Payment Audit
+              Cashier Shift & Reconciliation
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 border border-blue-200">
-              <ShieldCheck size={14} /> Cashier Audit
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+              <ShieldCheck size={14} /> POS Shift Handover (Z-Report)
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Real-time daily transaction history, server waiter attribution, and payment audits.
+            Real-time cashier drawer reconciliation, payment method breakdowns, cash counting, and shift handover.
           </p>
         </div>
 

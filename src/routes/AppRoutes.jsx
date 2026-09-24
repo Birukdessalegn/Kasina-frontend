@@ -181,6 +181,10 @@ function AppRoutes() {
                 element={<TodaySalesAuditPage />}
               />
               <Route
+                path="/pos/reconciliation"
+                element={<TodaySalesAuditPage />}
+              />
+              <Route
                 path="/pos/tables"
                 element={<TablesPage />}
               />

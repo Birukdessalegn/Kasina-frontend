@@ -28,7 +28,7 @@ const menuItems = [
     icon: CheckCircle2,
   },
   {
-    name: "Daily Sales Audit",
+    name: "Shift & Reconciliation",
     path: "/pos/sales-audit",
     icon: Receipt,
   },

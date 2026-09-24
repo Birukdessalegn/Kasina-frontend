@@ -137,14 +137,9 @@ const navigationGroups = [
             icon: CheckCircle2,
           },
           {
-            name: "Daily Sales Audit",
+            name: "Cashier Shift & Reconciliation",
             path: "/pos/sales-audit",
             icon: Receipt,
-          },
-          {
-            name: "Cashier Reconciliation",
-            path: "/finance/cashier-reconciliation",
-            icon: CreditCard,
           },
           {
             name: "POS Reports",
