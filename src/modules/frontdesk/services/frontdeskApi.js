@@ -90,6 +90,15 @@ export const uploadGuestIdImage = (id, file) => {
   });
 };
 
+export const uploadStandaloneGuestId = (file) => {
+  const formData = new FormData();
+  formData.append("id_image", file);
+  return api("/room-reservations/upload-id", {
+    method: "POST",
+    body: formData,
+  });
+};
+
 export const checkInReservation = (id) =>
   api(`/room-reservations/${id}/check-in`, {
     method: "POST",

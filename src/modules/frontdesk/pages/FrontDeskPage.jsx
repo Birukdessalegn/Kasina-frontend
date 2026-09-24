@@ -39,6 +39,7 @@ import {
   createReservation,
   updateReservation,
   uploadGuestIdImage,
+  uploadStandaloneGuestId,
   checkInReservation,
   checkOutReservation,
   addReservationPayment,
@@ -411,13 +412,25 @@ export default function FrontDeskPage() {
     }
 
     try {
+      let uploadedIdUrl = null;
+      if (bookingForm.id_image_file) {
+        try {
+          const upRes = await uploadStandaloneGuestId(bookingForm.id_image_file);
+          uploadedIdUrl = upRes.imageUrl;
+        } catch (uploadErr) {
+          console.warn("Pre-upload failed, will fallback:", uploadErr);
+        }
+      }
+
+      const { id_image_file, id_image_preview, ...cleanBookingForm } = bookingForm;
       const created = await createReservation({
-        ...bookingForm,
+        ...cleanBookingForm,
+        id_image_url: uploadedIdUrl || (id_image_preview ? id_image_preview : null),
         is_walkin: bookingType === "walkin",
       });
 
       const resId = created?.data?.id;
-      if (resId && bookingForm.id_image_file) {
+      if (resId && bookingForm.id_image_file && !uploadedIdUrl) {
         try {
           await uploadGuestIdImage(resId, bookingForm.id_image_file);
         } catch (uploadErr) {

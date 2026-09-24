@@ -15,7 +15,10 @@ import {
   Eye,
   Check,
   Loader2,
-  Upload
+  Upload,
+  Plus,
+  BedDouble,
+  Mail
 } from "lucide-react";
 import {
   getReservations,
@@ -25,6 +28,9 @@ import {
   cancelReservation,
   updateReservation,
   uploadGuestIdImage,
+  uploadStandaloneGuestId,
+  createReservation,
+  getRooms,
 } from "../services/frontdeskApi";
 
 const STATUS_COLORS = {
@@ -36,11 +42,38 @@ const STATUS_COLORS = {
 };
 
 export default function ReservationsListPage() {
+  const today = new Date().toISOString().split("T")[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
+
+  // New Reservation Modal state
+  const [newResModalOpen, setNewResModalOpen] = useState(false);
+  const [rooms, setRooms] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [submittingNewRes, setSubmittingNewRes] = useState(false);
+  const [newResForm, setNewResForm] = useState({
+    guest_name: "",
+    guest_phone: "",
+    guest_email: "",
+    guest_id_number: "",
+    id_image_file: null,
+    id_image_preview: null,
+    room_id: "",
+    check_in_date: today,
+    check_out_date: tomorrow,
+    adults: 1,
+    children: 0,
+    rate_per_night: "",
+    initial_payment: "",
+    payment_method: "cash",
+    transaction_reference: "",
+    special_requests: "",
+  });
 
   // Modals
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -101,6 +134,89 @@ export default function ReservationsListPage() {
     }
   };
 
+  // Open New Reservation Modal
+  const handleOpenNewResModal = async () => {
+    setNewResForm({
+      guest_name: "",
+      guest_phone: "",
+      guest_email: "",
+      guest_id_number: "",
+      id_image_file: null,
+      id_image_preview: null,
+      room_id: "",
+      check_in_date: today,
+      check_out_date: tomorrow,
+      adults: 1,
+      children: 0,
+      rate_per_night: "",
+      initial_payment: "",
+      payment_method: "cash",
+      transaction_reference: "",
+      special_requests: "",
+    });
+    setNewResModalOpen(true);
+    try {
+      setLoadingRooms(true);
+      const rRes = await getRooms();
+      setRooms(rRes.data || rRes.rooms || []);
+    } catch (err) {
+      console.error("Failed to load rooms:", err);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
+  // Save New Reservation (with ID photo support)
+  const handleSaveNewReservation = async (e) => {
+    e.preventDefault();
+    if (!newResForm.room_id) {
+      showToast("Please select a room", "error");
+      return;
+    }
+    if (!newResForm.guest_name.trim()) {
+      showToast("Guest name is required", "error");
+      return;
+    }
+
+    try {
+      setSubmittingNewRes(true);
+
+      let uploadedIdUrl = null;
+      if (newResForm.id_image_file) {
+        try {
+          const upRes = await uploadStandaloneGuestId(newResForm.id_image_file);
+          uploadedIdUrl = upRes.imageUrl;
+        } catch (uploadErr) {
+          console.warn("Pre-upload ID failed, will fallback:", uploadErr);
+        }
+      }
+
+      const { id_image_file, id_image_preview, ...cleanForm } = newResForm;
+      const created = await createReservation({
+        ...cleanForm,
+        id_image_url: uploadedIdUrl || (id_image_preview ? id_image_preview : null),
+        is_walkin: false,
+      });
+
+      const resId = created?.data?.id;
+      if (resId && newResForm.id_image_file && !uploadedIdUrl) {
+        try {
+          await uploadGuestIdImage(resId, newResForm.id_image_file);
+        } catch (uploadErr) {
+          console.warn("Fallback ID upload warning:", uploadErr);
+        }
+      }
+
+      showToast("Reservation created successfully with guest ID!");
+      setNewResModalOpen(false);
+      loadReservations();
+    } catch (err) {
+      showToast(err.message || "Failed to create reservation", "error");
+    } finally {
+      setSubmittingNewRes(false);
+    }
+  };
+
   // Open Update ID Modal
   const handleOpenUpdateIdModal = (res) => {
     setSelectedResForUpdate(res);
@@ -130,8 +246,18 @@ export default function ReservationsListPage() {
 
       let uploadedUrl = null;
       if (idUpdateForm.id_image_file) {
-        const uploadRes = await uploadGuestIdImage(resId, idUpdateForm.id_image_file);
-        uploadedUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+        try {
+          const uploadRes = await uploadGuestIdImage(resId, idUpdateForm.id_image_file);
+          uploadedUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+        } catch (uploadErr) {
+          console.warn("Upload via multipart failed, trying standalone:", uploadErr);
+          try {
+            const sRes = await uploadStandaloneGuestId(idUpdateForm.id_image_file);
+            uploadedUrl = sRes.imageUrl;
+          } catch (sErr) {
+            console.warn("Standalone upload failed:", sErr);
+          }
+        }
       }
 
       await updateReservation(resId, {
@@ -139,7 +265,11 @@ export default function ReservationsListPage() {
         guest_id_number: idUpdateForm.guest_id_number,
         guest_phone: idUpdateForm.guest_phone,
         special_requests: idUpdateForm.special_requests,
-        ...(uploadedUrl ? { id_image_url: uploadedUrl } : {}),
+        ...(uploadedUrl
+          ? { id_image_url: uploadedUrl }
+          : idUpdateForm.id_image_preview
+          ? { id_image_url: idUpdateForm.id_image_preview }
+          : {}),
       });
 
       showToast("Guest details and ID photo updated successfully!");
@@ -246,15 +376,26 @@ export default function ReservationsListPage() {
           ))}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-          <input
-            type="text"
-            placeholder="Search guest, code, room..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs outline-none focus:border-blue-500 sm:w-64"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              type="text"
+              placeholder="Search guest, code, room..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs outline-none focus:border-blue-500 sm:w-64"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenNewResModal}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition shrink-0"
+          >
+            <Plus size={15} />
+            <span>New Reservation</span>
+          </button>
         </div>
       </div>
 
@@ -288,20 +429,49 @@ export default function ReservationsListPage() {
                     {r.guest_id_number && (
                       <p className="text-[11px] text-slate-500 font-mono">ID: {r.guest_id_number}</p>
                     )}
-                    <div className="mt-1.5">
+                    <div className="mt-2 flex items-center gap-2">
                       {r.id_image_url ? (
-                        <button
-                          onClick={() => handleViewIdImage(r.id_image_url)}
-                          className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
-                        >
-                          <Eye size={11} /> 🪪 ID Attached
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewIdImage(r.id_image_url)}
+                            className="group relative h-9 w-14 shrink-0 overflow-hidden rounded-lg border border-emerald-300 shadow-sm transition hover:scale-105"
+                            title="Click to view full ID photo"
+                          >
+                            <img
+                              src={getFullImageUrl(r.id_image_url)}
+                              alt="Guest ID"
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                              <Eye size={12} className="text-white" />
+                            </div>
+                          </button>
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleViewIdImage(r.id_image_url)}
+                              className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
+                            >
+                              <Check size={11} /> 🪪 ID Attached
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenUpdateIdModal(r)}
+                              className="text-[10px] text-slate-500 hover:text-blue-600 font-medium hover:underline text-left"
+                            >
+                              Change photo
+                            </button>
+                          </div>
+                        </div>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => handleOpenUpdateIdModal(r)}
-                          className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100 transition"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-sm"
                         >
-                          <Camera size={11} /> ⚠️ Upload ID
+                          <Camera size={13} />
+                          <span>+ Add Photo of ID</span>
                         </button>
                       )}
                     </div>
@@ -381,6 +551,367 @@ export default function ReservationsListPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ====================================================
+          MODAL: NEW RESERVATION WITH ID PHOTO
+      ==================================================== */}
+      {newResModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl overflow-hidden my-6">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 bg-gradient-to-r from-blue-50/60 to-indigo-50/60">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                  <CalendarCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    New Room Reservation
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Book a room and attach guest identification photo
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewResModalOpen(false)}
+                className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-600 transition shadow-sm"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewReservation} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Guest Details Section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Guest Information
+                </h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. John Doe"
+                      value={newResForm.guest_name}
+                      onChange={(e) => setNewResForm({ ...newResForm, guest_name: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="+251 91 234 5678"
+                      value={newResForm.guest_phone}
+                      onChange={(e) => setNewResForm({ ...newResForm, guest_phone: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="guest@example.com"
+                      value={newResForm.guest_email}
+                      onChange={(e) => setNewResForm({ ...newResForm, guest_email: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      ID / Passport No.
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. EP1234567"
+                      value={newResForm.guest_id_number}
+                      onChange={(e) => setNewResForm({ ...newResForm, guest_id_number: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* ID Photo Capture / Upload Card */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Camera size={14} className="text-blue-600" />
+                        Guest ID / Passport Photo (Camera or File)
+                      </span>
+                      {newResForm.id_image_preview && (
+                        <button
+                          type="button"
+                          onClick={() => setNewResForm({ ...newResForm, id_image_file: null, id_image_preview: null })}
+                          className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        >
+                          Remove Photo
+                        </button>
+                      )}
+                    </label>
+
+                    {newResForm.id_image_preview ? (
+                      <div className="relative flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-2.5">
+                        <img
+                          src={newResForm.id_image_preview}
+                          alt="ID Preview"
+                          className="h-16 w-24 rounded-lg object-cover border border-blue-200 shadow-sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">
+                            {newResForm.id_image_file?.name || "Photo Captured"}
+                          </p>
+                          <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
+                            <Check size={12} /> ID photo ready to attach to reservation
+                          </p>
+                        </div>
+                        <label className="cursor-pointer rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm">
+                          Retake
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  setNewResForm({
+                                    ...newResForm,
+                                    id_image_file: file,
+                                    id_image_preview: ev.target.result,
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4 transition hover:border-blue-400 hover:bg-blue-50/30">
+                        <div className="flex items-center gap-2.5 text-slate-600">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-sm">
+                            <Camera size={18} />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-xs font-bold text-slate-800 block">
+                              Snap ID Photo with Camera or Upload File
+                            </span>
+                            <span className="text-[11px] text-slate-500 block">
+                              Tap to open mobile camera or browse computer files
+                            </span>
+                          </div>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setNewResForm({
+                                  ...newResForm,
+                                  id_image_file: file,
+                                  id_image_preview: ev.target.result,
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Room & Stay Details */}
+              <div className="pt-2 border-t border-slate-100">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Stay Details
+                </h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Room *
+                    </label>
+                    <select
+                      required
+                      value={newResForm.room_id}
+                      onChange={(e) => {
+                        const rId = e.target.value;
+                        const sel = rooms.find((r) => String(r.id) === rId);
+                        setNewResForm({
+                          ...newResForm,
+                          room_id: rId,
+                          rate_per_night: sel?.base_rate ? String(sel.base_rate) : newResForm.rate_per_night,
+                        });
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    >
+                      <option value="">-- Select Room --</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          Room #{r.room_number} ({r.room_type_name || r.type_name || "Standard"}) - Floor {r.floor} • ${r.base_rate || 0}/night [{r.status}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Check-In Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={newResForm.check_in_date}
+                      onChange={(e) => setNewResForm({ ...newResForm, check_in_date: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Check-Out Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={newResForm.check_out_date}
+                      onChange={(e) => setNewResForm({ ...newResForm, check_out_date: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Adults
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newResForm.adults}
+                      onChange={(e) => setNewResForm({ ...newResForm, adults: parseInt(e.target.value, 10) || 1 })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Children
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newResForm.children}
+                      onChange={(e) => setNewResForm({ ...newResForm, children: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Rate per Night ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 75.00"
+                      value={newResForm.rate_per_night}
+                      onChange={(e) => setNewResForm({ ...newResForm, rate_per_night: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Initial Deposit / Payment ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={newResForm.initial_payment}
+                      onChange={(e) => setNewResForm({ ...newResForm, initial_payment: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Payment Method
+                    </label>
+                    <select
+                      value={newResForm.payment_method}
+                      onChange={(e) => setNewResForm({ ...newResForm, payment_method: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="card">Credit / Debit Card</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="mobile_money">Mobile Money (Telebirr / CBE)</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Special Requests / Notes
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Guest preferences, airport pickup, late arrival..."
+                      value={newResForm.special_requests}
+                      onChange={(e) => setNewResForm({ ...newResForm, special_requests: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setNewResModalOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  disabled={submittingNewRes}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingNewRes}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                  {submittingNewRes ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Creating Reservation...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} />
+                      Confirm Reservation
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Payment Modal */}
       {paymentModalOpen && selectedRes && (
