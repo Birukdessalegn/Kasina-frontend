@@ -29,18 +29,6 @@ import FinanceLayout from "../layouts/FinanceLayout";
 
 // Pages
 import DashboardPage from "../modules/dashboard/pages/DashboardPage";
-import AdminDashboardPage from "../modules/dashboard/pages/AdminDashboardPage";
-import { useAuth } from "../context/AuthContext";
-
-function DashboardRoleSwitch() {
-  const { user } = useAuth();
-  const normalizedRole = user?.role ? String(user.role).toUpperCase() : "";
-
-  if (["ADMIN", "HOTEL_MANAGER", "COOPERATIVE_MANAGER"].includes(normalizedRole)) {
-    return <AdminDashboardPage />;
-  }
-  return <DashboardPage />;
-}
 
 import KitchenPage from "../modules/kitchen/pages/KitchenPage";
 import CafeKitchenPage from "../modules/kitchen/pages/CafeKitchenPage";
@@ -135,7 +123,7 @@ function AppRoutes() {
             >
               <Route
                 path="/dashboard"
-                element={<DashboardRoleSwitch />}
+                element={<DashboardPage />}
               />
             </Route>
 

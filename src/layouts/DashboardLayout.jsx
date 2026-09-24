@@ -769,14 +769,6 @@ function DashboardLayout() {
               });
               return { ...item, children: visibleChildren };
             }
-            if (item.path === "/dashboard") {
-              return {
-                ...item,
-                name: (normalizedRole === "ADMIN" || normalizedRole === "HOTEL_MANAGER")
-                  ? "Executive Live Command"
-                  : "Manager Dashboard",
-              };
-            }
             return item;
           })
           .filter((item) => !item.children || item.children.length > 0);
