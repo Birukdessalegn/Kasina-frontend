@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [timeframe, setTimeframe] = useState("today"); // "today" | "week" | "month" | "all"
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -307,52 +308,155 @@ export default function DashboardPage() {
   }
 
   // ============================================================
-  // DASHBOARD VALUES
+  // TIMEFRAME FILTERING HELPER & AGGREGATED METRICS
   // ============================================================
 
-  const todayOrders = Number(
-    dashboard?.today_orders || 0
-  );
+  const isDateInTimeframe = (dateVal, tf) => {
+    if (tf === "all") return true;
+    if (!dateVal) return tf === "today";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return true;
 
-  const activeTables = Number(
-    dashboard?.active_tables || 0
-  );
+    const now = new Date();
+    const nowYear = now.getFullYear();
+    const nowMonth = now.getMonth();
+    const nowDate = now.getDate();
 
-  const todaySales = Number(
-    dashboard?.today_sales || 0
-  );
+    if (tf === "today") {
+      return (
+        d.getFullYear() === nowYear &&
+        d.getMonth() === nowMonth &&
+        d.getDate() === nowDate
+      );
+    }
 
-  const pendingKitchenOrders = Number(
-    dashboard?.pending_kitchen_orders || 0
-  );
+    if (tf === "week") {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      return d >= sevenDaysAgo && d <= now;
+    }
 
-  const pendingBarOrders = Number(
-    dashboard?.pending_bar_orders || 0
-  );
+    if (tf === "month") {
+      return d.getFullYear() === nowYear && d.getMonth() === nowMonth;
+    }
 
-  const grandTotalRevenue = Number(
-    dashboard?.grand_total_revenue ??
-    dashboard?.all_time_sales ??
-    dashboard?.total_revenue ??
-    0
-  );
+    return true;
+  };
 
-  const roomSalesAllTime = Number(
-    dashboard?.room_sales_all_time ??
-    dashboard?.total_room_reservations_amount ??
-    0
-  );
+  const filteredData = useMemo(() => {
+    // 1. Paid orders matching timeframe
+    const tfPaidOrders = (orders || []).filter((ord) => {
+      const st = String(ord.status || "").toLowerCase();
+      const paySt = String(ord.payment_status || "").toLowerCase();
+      const isPaid =
+        st === "completed" ||
+        st === "paid" ||
+        paySt === "paid" ||
+        ord.is_paid === true;
+      if (!isPaid) return false;
+      const d = ord.created_at || ord.createdAt || ord.order_date || ord.date || ord.paid_at;
+      return isDateInTimeframe(d, timeframe);
+    });
 
-  const posSalesAllTime = Number(
-    dashboard?.pos_sales_all_time ??
-    dashboard?.today_sales ??
-    0
-  );
+    const tfAllOrders = (orders || []).filter((ord) => {
+      const st = String(ord.status || "").toLowerCase();
+      if (st === "cancelled" || st === "void") return false;
+      const d = ord.created_at || ord.createdAt || ord.order_date || ord.date;
+      return isDateInTimeframe(d, timeframe);
+    });
 
-  const activeFloorAmount = Number(
-    dashboard?.active_orders_amount ??
-    0
-  );
+    const tfPaidPosTotal = tfPaidOrders.reduce((sum, o) => {
+      return sum + Number(o.total_amount || o.total || o.grand_total || 0);
+    }, 0);
+
+    // 2. Reservations matching timeframe
+    const tfReservations = (reservations || []).filter((r) => {
+      const d = r.created_at || r.createdAt || r.check_in || r.check_in_date || r.date;
+      return isDateInTimeframe(d, timeframe);
+    });
+
+    const tfPaidRoomsTotal = tfReservations.reduce((sum, r) => {
+      return sum + Number(r.paid_amount || r.total_amount || 0);
+    }, 0);
+
+    // 3. Expenses matching timeframe
+    const tfExpenses = (expenses || []).filter((e) => {
+      const d = e.date || e.created_at || e.createdAt;
+      return isDateInTimeframe(d, timeframe);
+    });
+
+    const tfExpensesTotal = tfExpenses.reduce((sum, e) => {
+      return sum + Number(e.amount || 0);
+    }, 0);
+
+    // Resolve POS sales with fallback to backend stats
+    let activePosSales = tfPaidPosTotal;
+    let activeRoomSales = tfPaidRoomsTotal;
+    let activeOrdersCount = tfAllOrders.length;
+    let activeExpensesAmount = tfExpensesTotal;
+
+    if (timeframe === "today") {
+      activePosSales = Math.max(tfPaidPosTotal, Number(dashboard?.today_sales || 0));
+      activeRoomSales = Math.max(tfPaidRoomsTotal, Number(dashboard?.today_room_sales || 0));
+      activeOrdersCount = Math.max(tfAllOrders.length, Number(dashboard?.today_orders || 0));
+      activeExpensesAmount = Math.max(tfExpensesTotal, Number(dashboard?.today_expenses || 0));
+    } else if (timeframe === "all") {
+      activePosSales = Math.max(
+        tfPaidPosTotal,
+        Number(
+          dashboard?.pos_sales_all_time ||
+          dashboard?.all_time_sales ||
+          dashboard?.total_revenue ||
+          0
+        )
+      );
+      activeRoomSales = Math.max(
+        tfPaidRoomsTotal,
+        Number(
+          dashboard?.room_sales_all_time ||
+          dashboard?.total_room_reservations_amount ||
+          0
+        )
+      );
+      activeOrdersCount = Math.max(tfAllOrders.length, Number(dashboard?.total_orders || 0));
+      activeExpensesAmount = Math.max(tfExpensesTotal, Number(dashboard?.total_expenses || 0));
+    } else if (timeframe === "week") {
+      const weeklySum = Array.isArray(dashboard?.sales_chart)
+        ? dashboard.sales_chart.reduce((s, it) => s + Number(it.sales || it.total || 0), 0)
+        : Number(dashboard?.weekly_sales || 0);
+      if (activePosSales === 0 && weeklySum > 0) activePosSales = weeklySum;
+      if (activeOrdersCount === 0 && dashboard?.weekly_orders) activeOrdersCount = Number(dashboard.weekly_orders);
+    } else if (timeframe === "month") {
+      const monthlySum = Number(dashboard?.monthly_sales || dashboard?.all_time_sales || 0);
+      if (activePosSales === 0 && monthlySum > 0) activePosSales = monthlySum;
+      if (activeOrdersCount === 0 && dashboard?.monthly_orders) activeOrdersCount = Number(dashboard.monthly_orders);
+    }
+
+    const activeGrandRevenue = activePosSales + activeRoomSales;
+
+    return {
+      activeGrandRevenue,
+      activeRoomSales,
+      activePosSales,
+      activeOrdersCount,
+      activeExpensesAmount,
+    };
+  }, [orders, reservations, expenses, dashboard, timeframe]);
+
+  const activeTables = Number(dashboard?.active_tables || 0);
+  const pendingKitchenOrders = Number(dashboard?.pending_kitchen_orders || 0);
+  const pendingBarOrders = Number(dashboard?.pending_bar_orders || 0);
+  const activeFloorAmount = Number(dashboard?.active_orders_amount ?? 0);
+
+  const timeframeLabel =
+    timeframe === "today"
+      ? "Today"
+      : timeframe === "week"
+      ? "This Week"
+      : timeframe === "month"
+      ? "This Month"
+      : "All-Time";
 
   // ============================================================
   // STAT CARDS
@@ -360,28 +464,28 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      title: "Whole Hotel Revenue",
-      value: formatMoney(grandTotalRevenue),
-      description: "Rooms + Food & Bar (All-time)",
+      title: `${timeframeLabel} Revenue`,
+      value: formatMoney(filteredData.activeGrandRevenue),
+      description: `Rooms + Food & Bar (${timeframeLabel})`,
       icon: Sparkles,
       highlight: true,
     },
     {
       title: "Room Lodging Sales",
-      value: formatMoney(roomSalesAllTime),
-      description: "100% Settled room bookings",
+      value: formatMoney(filteredData.activeRoomSales),
+      description: `Settled bookings (${timeframeLabel})`,
       icon: BedDouble,
     },
     {
       title: "Food & Bar Sales",
-      value: formatMoney(posSalesAllTime),
-      description: `Today: ${formatMoney(todaySales)}`,
+      value: formatMoney(filteredData.activePosSales),
+      description: `POS orders (${timeframeLabel})`,
       icon: Utensils,
     },
     {
-      title: "Today's Orders",
-      value: todayOrders.toLocaleString(),
-      description: "Orders created today",
+      title: `${timeframeLabel} Orders`,
+      value: filteredData.activeOrdersCount.toLocaleString(),
+      description: `Orders created (${timeframeLabel})`,
       icon: ShoppingCart,
     },
     {
@@ -392,10 +496,7 @@ export default function DashboardPage() {
     },
     {
       title: "Pending Orders",
-      value: (
-        pendingKitchenOrders +
-        pendingBarOrders
-      ).toLocaleString(),
+      value: (pendingKitchenOrders + pendingBarOrders).toLocaleString(),
       description: `${pendingKitchenOrders} kitchen · ${pendingBarOrders} bar`,
       icon: Clock,
     },
@@ -435,14 +536,63 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Timeframe Filter (Today / Week / Month / All-Time) */}
+          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setTimeframe("today")}
+              className={`rounded-lg px-3 py-1.5 transition ${
+                timeframe === "today"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeframe("week")}
+              className={`rounded-lg px-3 py-1.5 transition ${
+                timeframe === "week"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              Week
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeframe("month")}
+              className={`rounded-lg px-3 py-1.5 transition ${
+                timeframe === "month"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              Month
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeframe("all")}
+              className={`rounded-lg px-3 py-1.5 transition ${
+                timeframe === "all"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              All-Time
+            </button>
+          </div>
+
           {/* Live Auto Refresh Toggle */}
           <button
             type="button"
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${autoRefresh
+            className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+              autoRefresh
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border-slate-200 bg-slate-50 text-slate-600"
-              }`}
+            }`}
           >
             <Radio className={`h-3.5 w-3.5 ${autoRefresh ? "animate-pulse text-emerald-600" : ""}`} />
             {autoRefresh ? "Live 10s Active" : "Live Paused"}
@@ -454,8 +604,9 @@ export default function DashboardPage() {
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RefreshCw
-              className={`h-4 w-4 ${loading || isRefreshing ? "animate-spin text-indigo-600" : ""
-                }`}
+              className={`h-4 w-4 ${
+                loading || isRefreshing ? "animate-spin text-indigo-600" : ""
+              }`}
             />
             {isRefreshing ? "Updating..." : "Refresh"}
           </button>
@@ -475,10 +626,15 @@ export default function DashboardPage() {
               <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30">
                 WHOLE HOTEL REVENUE ACTIVE
               </span>
-              <span className="text-xs font-semibold text-slate-300">Rooms + Food & Bar POS</span>
+              <span className="text-xs font-semibold text-slate-300">
+                Rooms + Food & Bar POS ({timeframeLabel})
+              </span>
             </div>
             <p className="text-base font-black text-white mt-0.5">
-              Whole Hotel Grand Revenue: <span className="text-amber-400 font-mono">{formatMoney(grandTotalRevenue)}</span>
+              Whole Hotel {timeframeLabel} Revenue:{" "}
+              <span className="text-amber-400 font-mono">
+                {formatMoney(filteredData.activeGrandRevenue)}
+              </span>
             </p>
           </div>
         </div>
@@ -487,17 +643,23 @@ export default function DashboardPage() {
           <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2.5 py-1">
             <BedDouble className="h-3.5 w-3.5 text-blue-400" />
             <span className="text-slate-300">Rooms:</span>
-            <span className="font-bold text-blue-300 font-mono">{formatMoney(roomSalesAllTime)}</span>
+            <span className="font-bold text-blue-300 font-mono">
+              {formatMoney(filteredData.activeRoomSales)}
+            </span>
           </div>
           <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2.5 py-1">
             <Utensils className="h-3.5 w-3.5 text-emerald-400" />
             <span className="text-slate-300">Food & Bar:</span>
-            <span className="font-bold text-emerald-300 font-mono">{formatMoney(posSalesAllTime)}</span>
+            <span className="font-bold text-emerald-300 font-mono">
+              {formatMoney(filteredData.activePosSales)}
+            </span>
           </div>
           <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2.5 py-1">
             <Clock className="h-3.5 w-3.5 text-amber-400" />
             <span className="text-slate-300">Floor Tabs:</span>
-            <span className="font-bold text-amber-300 font-mono">{formatMoney(activeFloorAmount)}</span>
+            <span className="font-bold text-amber-300 font-mono">
+              {formatMoney(activeFloorAmount)}
+            </span>
           </div>
         </div>
       </div>
@@ -590,11 +752,11 @@ export default function DashboardPage() {
         {/* Expenses */}
 
         <SummaryCard
-          title="Today's Expenses"
+          title={`${timeframeLabel} Expenses`}
           value={formatMoney(
-            dashboard?.today_expenses
+            filteredData.activeExpensesAmount
           )}
-          description="Paid expenses today"
+          description={`Paid expenses (${timeframeLabel})`}
           icon={DollarSign}
         />
       </div>
@@ -615,6 +777,7 @@ export default function DashboardPage() {
             expenses={expenses}
             metrics={metrics}
             formatMoney={formatMoney}
+            externalTimeframe={timeframe}
           />
         </div>
 

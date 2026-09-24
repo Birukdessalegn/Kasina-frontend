@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { TrendingUp } from "lucide-react";
 
 export default function SmoothMonthlyRevenueChart({
@@ -7,9 +7,23 @@ export default function SmoothMonthlyRevenueChart({
   expenses = [],
   metrics = {},
   formatMoney = (v) => `${Number(v || 0).toLocaleString()} ETB`,
+  externalTimeframe,
 }) {
   const [chartTimeframe, setChartTimeframe] = useState("monthly"); // "daily" | "weekly" | "monthly"
   const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (externalTimeframe === "today") {
+      setChartTimeframe("daily");
+      setActiveIdx(Math.min(5, 6));
+    } else if (externalTimeframe === "week") {
+      setChartTimeframe("weekly");
+      setActiveIdx(Math.min(3, 3));
+    } else if (externalTimeframe === "month" || externalTimeframe === "all") {
+      setChartTimeframe("monthly");
+      setActiveIdx(Math.min(8, 11));
+    }
+  }, [externalTimeframe]);
 
   const baseRevenue = metrics?.grossRevenue || 0;
   const baseExpenses = metrics?.totalExpenses || 0;
