@@ -7,7 +7,6 @@ import PurchasingPage from "../modules/purchasing/pages/PurchasingPage";
 import PaymentPage from "../modules/pos/pages/PaymentPage";
 import TablesPage from "../modules/pos/components/TablesPage";
 import ProductsPage from "../modules/products/ProductsPage";  
-import VipCustomersPage from "../modules/customers/VipCustomersPage";
 import WaiterServedOrdersPage from "../modules/pos/pages/WaiterServedOrdersPage";
 
 
@@ -385,24 +384,6 @@ function AppRoutes() {
             </Route>
 
 
-            {/* -------------------------
-                CUSTOMERS & VIP LEDGER
-            -------------------------- */}
-
-            <Route
-              element={
-                <PermissionRoute permission="customers" />
-              }
-            >
-              <Route
-                path="/customers"
-                element={<VipCustomersPage />}
-              />
-              <Route
-                path="/admin/vip-customers"
-                element={<VipCustomersPage />}
-              />
-            </Route>
 
 
 

@@ -1063,13 +1063,7 @@ export default function AdminDashboardPage() {
             VIP Payments & Credit Log
           </button>
 
-          <Link
-            to="/customers"
-            className="flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-xs font-extrabold transition shadow-xs cursor-pointer"
-          >
-            <Users className="h-4 w-4" />
-            VIP Customers & Ledger
-          </Link>
+
 
           <Link
             to="/finance/cashier-reconciliation"

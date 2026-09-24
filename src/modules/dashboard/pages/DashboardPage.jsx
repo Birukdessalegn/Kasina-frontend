@@ -809,27 +809,7 @@ export default function DashboardPage() {
               <ArrowUpRight className="h-4 w-4 text-gray-400" />
             </Link>
 
-            {/* Customers */}
 
-            <Link
-              to="/customers"
-              className="flex w-full items-center justify-between rounded-xl border border-gray-200 p-3.5 text-left transition hover:border-purple-300 hover:bg-purple-50/50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100 text-purple-600">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">
-                    VIP & Customers
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    VIP credit limits & ledger
-                  </p>
-                </div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-gray-400" />
-            </Link>
 
             {/* Bar */}
 

@@ -342,13 +342,6 @@ const navigationGroups = [
         icon: Package,
         permission: "products.view",
       },
-
-      {
-        name: "VIP & Customers",
-        path: "/customers",
-        icon: Users,
-        permission: "customers.view",
-      },
     ],
   },
 
