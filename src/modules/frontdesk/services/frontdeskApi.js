@@ -81,18 +81,30 @@ export const updateReservation = (id, data) =>
     body: JSON.stringify(data),
   });
 
-export const uploadGuestIdImage = (id, file) => {
+export const uploadGuestIdImage = (id, frontFile, backFile = null) => {
   const formData = new FormData();
-  formData.append("id_image", file);
+  if (frontFile) {
+    formData.append("id_image_front", frontFile);
+    formData.append("id_image", frontFile);
+  }
+  if (backFile) {
+    formData.append("id_image_back", backFile);
+  }
   return api(`/room-reservations/${id}/upload-id`, {
     method: "POST",
     body: formData,
   });
 };
 
-export const uploadStandaloneGuestId = (file) => {
+export const uploadStandaloneGuestId = (frontFile, backFile = null) => {
   const formData = new FormData();
-  formData.append("id_image", file);
+  if (frontFile) {
+    formData.append("id_image_front", frontFile);
+    formData.append("id_image", frontFile);
+  }
+  if (backFile) {
+    formData.append("id_image_back", backFile);
+  }
   return api("/room-reservations/upload-id", {
     method: "POST",
     body: formData,

@@ -63,6 +63,8 @@ export default function ReservationsListPage() {
     guest_id_number: "",
     id_image_file: null,
     id_image_preview: null,
+    id_image_back_file: null,
+    id_image_back_preview: null,
     room_id: "",
     check_in_date: today,
     check_out_date: tomorrow,
@@ -93,12 +95,17 @@ export default function ReservationsListPage() {
     id_image_file: null,
     id_image_preview: null,
     existing_id_image_url: "",
+    id_image_back_file: null,
+    id_image_back_preview: null,
+    existing_id_image_back_url: "",
   });
   const [submittingIdUpdate, setSubmittingIdUpdate] = useState(false);
 
-  // Fullscreen ID Image Viewer Modal
+  // Fullscreen ID Image Viewer Modal (Supports Front & Back)
   const [idViewerModalOpen, setIdViewerModalOpen] = useState(false);
-  const [viewingIdImageUrl, setViewingIdImageUrl] = useState("");
+  const [viewingIdFrontUrl, setViewingIdFrontUrl] = useState("");
+  const [viewingIdBackUrl, setViewingIdBackUrl] = useState("");
+  const [viewingSide, setViewingSide] = useState("front");
 
   // Helper to build full backend image URL
   const getFullImageUrl = (rawImage) => {
@@ -143,6 +150,8 @@ export default function ReservationsListPage() {
       guest_id_number: "",
       id_image_file: null,
       id_image_preview: null,
+      id_image_back_file: null,
+      id_image_back_preview: null,
       room_id: "",
       check_in_date: today,
       check_out_date: tomorrow,
@@ -166,7 +175,7 @@ export default function ReservationsListPage() {
     }
   };
 
-  // Save New Reservation (with ID photo support)
+  // Save New Reservation (with Front and Back ID photos)
   const handleSaveNewReservation = async (e) => {
     e.preventDefault();
     if (!newResForm.room_id) {
@@ -181,33 +190,46 @@ export default function ReservationsListPage() {
     try {
       setSubmittingNewRes(true);
 
-      let uploadedIdUrl = null;
-      if (newResForm.id_image_file) {
+      let uploadedFrontUrl = null;
+      let uploadedBackUrl = null;
+      if (newResForm.id_image_file || newResForm.id_image_back_file) {
         try {
-          const upRes = await uploadStandaloneGuestId(newResForm.id_image_file);
-          uploadedIdUrl = upRes.imageUrl;
+          const upRes = await uploadStandaloneGuestId(
+            newResForm.id_image_file,
+            newResForm.id_image_back_file
+          );
+          uploadedFrontUrl = upRes.imageUrl || upRes.frontImageUrl;
+          uploadedBackUrl = upRes.backImageUrl;
         } catch (uploadErr) {
           console.warn("Pre-upload ID failed, will fallback:", uploadErr);
         }
       }
 
-      const { id_image_file, id_image_preview, ...cleanForm } = newResForm;
+      const {
+        id_image_file,
+        id_image_preview,
+        id_image_back_file,
+        id_image_back_preview,
+        ...cleanForm
+      } = newResForm;
+
       const created = await createReservation({
         ...cleanForm,
-        id_image_url: uploadedIdUrl || (id_image_preview ? id_image_preview : null),
+        id_image_url: uploadedFrontUrl || (id_image_preview ? id_image_preview : null),
+        id_image_back_url: uploadedBackUrl || (id_image_back_preview ? id_image_back_preview : null),
         is_walkin: false,
       });
 
       const resId = created?.data?.id;
-      if (resId && newResForm.id_image_file && !uploadedIdUrl) {
+      if (resId && (newResForm.id_image_file || newResForm.id_image_back_file) && (!uploadedFrontUrl && !uploadedBackUrl)) {
         try {
-          await uploadGuestIdImage(resId, newResForm.id_image_file);
+          await uploadGuestIdImage(resId, newResForm.id_image_file, newResForm.id_image_back_file);
         } catch (uploadErr) {
           console.warn("Fallback ID upload warning:", uploadErr);
         }
       }
 
-      showToast("Reservation created successfully with guest ID!");
+      showToast("Reservation created successfully with ID photos!");
       setNewResModalOpen(false);
       loadReservations();
     } catch (err) {
@@ -228,11 +250,14 @@ export default function ReservationsListPage() {
       id_image_file: null,
       id_image_preview: null,
       existing_id_image_url: res.id_image_url || "",
+      id_image_back_file: null,
+      id_image_back_preview: null,
+      existing_id_image_back_url: res.id_image_back_url || "",
     });
     setUpdateIdModalOpen(true);
   };
 
-  // Save ID Update
+  // Save ID Update (Front & Back)
   const handleSaveIdUpdate = async (e) => {
     e.preventDefault();
     if (!selectedResForUpdate?.id) {
@@ -244,16 +269,26 @@ export default function ReservationsListPage() {
       setSubmittingIdUpdate(true);
       const resId = selectedResForUpdate.id;
 
-      let uploadedUrl = null;
-      if (idUpdateForm.id_image_file) {
+      let uploadedFrontUrl = null;
+      let uploadedBackUrl = null;
+      if (idUpdateForm.id_image_file || idUpdateForm.id_image_back_file) {
         try {
-          const uploadRes = await uploadGuestIdImage(resId, idUpdateForm.id_image_file);
-          uploadedUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+          const uploadRes = await uploadGuestIdImage(
+            resId,
+            idUpdateForm.id_image_file,
+            idUpdateForm.id_image_back_file
+          );
+          uploadedFrontUrl = uploadRes.imageUrl || uploadRes.data?.id_image_url;
+          uploadedBackUrl = uploadRes.backImageUrl || uploadRes.data?.id_image_back_url;
         } catch (uploadErr) {
           console.warn("Upload via multipart failed, trying standalone:", uploadErr);
           try {
-            const sRes = await uploadStandaloneGuestId(idUpdateForm.id_image_file);
-            uploadedUrl = sRes.imageUrl;
+            const sRes = await uploadStandaloneGuestId(
+              idUpdateForm.id_image_file,
+              idUpdateForm.id_image_back_file
+            );
+            uploadedFrontUrl = sRes.imageUrl || sRes.frontImageUrl;
+            uploadedBackUrl = sRes.backImageUrl;
           } catch (sErr) {
             console.warn("Standalone upload failed:", sErr);
           }
@@ -265,14 +300,19 @@ export default function ReservationsListPage() {
         guest_id_number: idUpdateForm.guest_id_number,
         guest_phone: idUpdateForm.guest_phone,
         special_requests: idUpdateForm.special_requests,
-        ...(uploadedUrl
-          ? { id_image_url: uploadedUrl }
+        ...(uploadedFrontUrl
+          ? { id_image_url: uploadedFrontUrl }
           : idUpdateForm.id_image_preview
           ? { id_image_url: idUpdateForm.id_image_preview }
           : {}),
+        ...(uploadedBackUrl
+          ? { id_image_back_url: uploadedBackUrl }
+          : idUpdateForm.id_image_back_preview
+          ? { id_image_back_url: idUpdateForm.id_image_back_preview }
+          : {}),
       });
 
-      showToast("Guest details and ID photo updated successfully!");
+      showToast("Guest details and ID photos updated successfully!");
       setUpdateIdModalOpen(false);
       loadReservations();
     } catch (err) {
@@ -282,8 +322,10 @@ export default function ReservationsListPage() {
     }
   };
 
-  const handleViewIdImage = (imageUrl) => {
-    setViewingIdImageUrl(imageUrl);
+  const handleViewIdImage = (frontUrl, backUrl = "") => {
+    setViewingIdFrontUrl(frontUrl || "");
+    setViewingIdBackUrl(backUrl || "");
+    setViewingSide(frontUrl ? "front" : (backUrl ? "back" : "front"));
     setIdViewerModalOpen(true);
   };
 
@@ -429,38 +471,69 @@ export default function ReservationsListPage() {
                     {r.guest_id_number && (
                       <p className="text-[11px] text-slate-500 font-mono">ID: {r.guest_id_number}</p>
                     )}
-                    <div className="mt-2 flex items-center gap-2">
-                      {r.id_image_url ? (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {r.id_image_url || r.id_image_back_url ? (
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleViewIdImage(r.id_image_url)}
-                            className="group relative h-9 w-14 shrink-0 overflow-hidden rounded-lg border border-emerald-300 shadow-sm transition hover:scale-105"
-                            title="Click to view full ID photo"
-                          >
-                            <img
-                              src={getFullImageUrl(r.id_image_url)}
-                              alt="Guest ID"
-                              className="h-full w-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                              <Eye size={12} className="text-white" />
-                            </div>
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {r.id_image_url && (
+                              <button
+                                type="button"
+                                onClick={() => handleViewIdImage(r.id_image_url, r.id_image_back_url)}
+                                className="group relative h-9 w-12 shrink-0 overflow-hidden rounded-lg border border-emerald-300 shadow-sm transition hover:scale-105"
+                                title="Click to view Front ID"
+                              >
+                                <img
+                                  src={getFullImageUrl(r.id_image_url)}
+                                  alt="Front ID"
+                                  className="h-full w-full object-cover"
+                                />
+                                <span className="absolute bottom-0 inset-x-0 bg-slate-950/70 text-[9px] font-bold text-white text-center py-0.2">
+                                  Front
+                                </span>
+                              </button>
+                            )}
+
+                            {r.id_image_back_url && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleViewIdImage(r.id_image_url, r.id_image_back_url);
+                                  setViewingSide("back");
+                                }}
+                                className="group relative h-9 w-12 shrink-0 overflow-hidden rounded-lg border border-emerald-300 shadow-sm transition hover:scale-105"
+                                title="Click to view Back ID"
+                              >
+                                <img
+                                  src={getFullImageUrl(r.id_image_back_url)}
+                                  alt="Back ID"
+                                  className="h-full w-full object-cover"
+                                />
+                                <span className="absolute bottom-0 inset-x-0 bg-slate-950/70 text-[9px] font-bold text-white text-center py-0.2">
+                                  Back
+                                </span>
+                              </button>
+                            )}
+                          </div>
+
                           <div className="flex flex-col gap-0.5">
                             <button
                               type="button"
-                              onClick={() => handleViewIdImage(r.id_image_url)}
+                              onClick={() => handleViewIdImage(r.id_image_url, r.id_image_back_url)}
                               className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
                             >
-                              <Check size={11} /> 🪪 ID Attached
+                              <Check size={11} />
+                              {r.id_image_url && r.id_image_back_url
+                                ? "🪪 Front & Back Attached"
+                                : r.id_image_url
+                                ? "🪪 Front Attached"
+                                : "🪪 Back Attached"}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleOpenUpdateIdModal(r)}
                               className="text-[10px] text-slate-500 hover:text-blue-600 font-medium hover:underline text-left"
                             >
-                              Change photo
+                              {!r.id_image_back_url ? "+ Add Back ID" : "Edit / Change photos"}
                             </button>
                           </div>
                         </div>
@@ -468,10 +541,10 @@ export default function ReservationsListPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenUpdateIdModal(r)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-sm"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-sm w-fit"
                         >
                           <Camera size={13} />
-                          <span>+ Add Photo of ID</span>
+                          <span>+ Add ID (Front & Back)</span>
                         </button>
                       )}
                     </div>
@@ -639,99 +712,193 @@ export default function ReservationsListPage() {
                   </div>
 
                   {/* ID Photo Capture / Upload Card */}
+                  {/* Guest ID Photo (Front & Back) */}
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-800 mb-2 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Camera size={14} className="text-blue-600" />
-                        Guest ID / Passport Photo (Camera or File)
+                        Guest ID / Passport Photos (Front & Back)
                       </span>
-                      {newResForm.id_image_preview && (
-                        <button
-                          type="button"
-                          onClick={() => setNewResForm({ ...newResForm, id_image_file: null, id_image_preview: null })}
-                          className="text-[11px] text-rose-600 hover:underline font-semibold"
-                        >
-                          Remove Photo
-                        </button>
-                      )}
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Optional but recommended
+                      </span>
                     </label>
 
-                    {newResForm.id_image_preview ? (
-                      <div className="relative flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-2.5">
-                        <img
-                          src={newResForm.id_image_preview}
-                          alt="ID Preview"
-                          className="h-16 w-24 rounded-lg object-cover border border-blue-200 shadow-sm"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">
-                            {newResForm.id_image_file?.name || "Photo Captured"}
-                          </p>
-                          <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-                            <Check size={12} /> ID photo ready to attach to reservation
-                          </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* FRONT OF ID */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">1</span>
+                            Front Side of ID
+                          </span>
+                          {newResForm.id_image_preview && (
+                            <button
+                              type="button"
+                              onClick={() => setNewResForm({ ...newResForm, id_image_file: null, id_image_preview: null })}
+                              className="text-[11px] text-rose-600 hover:underline font-semibold"
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
-                        <label className="cursor-pointer rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm">
-                          Retake
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (ev) => {
-                                  setNewResForm({
-                                    ...newResForm,
-                                    id_image_file: file,
-                                    id_image_preview: ev.target.result,
-                                  });
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
+
+                        {newResForm.id_image_preview ? (
+                          <div className="relative rounded-xl border border-blue-200 bg-white p-2 text-center">
+                            <img
+                              src={newResForm.id_image_preview}
+                              alt="Front ID Preview"
+                              className="h-28 w-full object-contain rounded-lg border border-slate-100 shadow-sm"
+                            />
+                            <p className="text-[11px] text-emerald-600 font-medium flex items-center justify-center gap-1 mt-1.5">
+                              <Check size={12} /> Front ID ready
+                            </p>
+                            <label className="mt-1.5 inline-block cursor-pointer rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200">
+                              Retake Front
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                      setNewResForm({
+                                        ...newResForm,
+                                        id_image_file: file,
+                                        id_image_preview: ev.target.result,
+                                      });
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white p-4 transition hover:border-blue-400 hover:bg-blue-50/20 text-center">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 mb-2 shadow-sm">
+                              <Camera size={16} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-800">
+                              Snap Front of ID
+                            </span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">
+                              Camera or file browse
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    setNewResForm({
+                                      ...newResForm,
+                                      id_image_file: file,
+                                      id_image_preview: ev.target.result,
+                                    });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
                       </div>
-                    ) : (
-                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4 transition hover:border-blue-400 hover:bg-blue-50/30">
-                        <div className="flex items-center gap-2.5 text-slate-600">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-sm">
-                            <Camera size={18} />
-                          </div>
-                          <div className="text-left">
-                            <span className="text-xs font-bold text-slate-800 block">
-                              Snap ID Photo with Camera or Upload File
-                            </span>
-                            <span className="text-[11px] text-slate-500 block">
-                              Tap to open mobile camera or browse computer files
-                            </span>
-                          </div>
+
+                      {/* BACK OF ID */}
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">2</span>
+                            Back Side of ID
+                          </span>
+                          {newResForm.id_image_back_preview && (
+                            <button
+                              type="button"
+                              onClick={() => setNewResForm({ ...newResForm, id_image_back_file: null, id_image_back_preview: null })}
+                              className="text-[11px] text-rose-600 hover:underline font-semibold"
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (ev) => {
-                                setNewResForm({
-                                  ...newResForm,
-                                  id_image_file: file,
-                                  id_image_preview: ev.target.result,
-                                });
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
-                    )}
+
+                        {newResForm.id_image_back_preview ? (
+                          <div className="relative rounded-xl border border-indigo-200 bg-white p-2 text-center">
+                            <img
+                              src={newResForm.id_image_back_preview}
+                              alt="Back ID Preview"
+                              className="h-28 w-full object-contain rounded-lg border border-slate-100 shadow-sm"
+                            />
+                            <p className="text-[11px] text-emerald-600 font-medium flex items-center justify-center gap-1 mt-1.5">
+                              <Check size={12} /> Back ID ready
+                            </p>
+                            <label className="mt-1.5 inline-block cursor-pointer rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200">
+                              Retake Back
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                      setNewResForm({
+                                        ...newResForm,
+                                        id_image_back_file: file,
+                                        id_image_back_preview: ev.target.result,
+                                      });
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white p-4 transition hover:border-indigo-400 hover:bg-indigo-50/20 text-center">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 mb-2 shadow-sm">
+                              <Camera size={16} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-800">
+                              Snap Back of ID
+                            </span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">
+                              Camera or file browse
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    setNewResForm({
+                                      ...newResForm,
+                                      id_image_back_file: file,
+                                      id_image_back_preview: ev.target.result,
+                                    });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1022,77 +1189,129 @@ export default function ReservationsListPage() {
             </div>
 
             <form onSubmit={handleSaveIdUpdate} className="p-6 space-y-4">
-              {/* Photo Area */}
+              {/* Dual Photo Area (Front & Back) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
-                  <span>Guest ID / Passport Photo</span>
-                  {idUpdateForm.id_image_preview && (
-                    <button
-                      type="button"
-                      onClick={() => setIdUpdateForm({ ...idUpdateForm, id_image_file: null, id_image_preview: null })}
-                      className="text-xs text-rose-600 hover:underline font-semibold"
-                    >
-                      Clear New Photo
-                    </button>
-                  )}
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Camera size={14} className="text-blue-600" />
+                    Guest ID Photos (Front & Back)
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    Capture or browse both sides
+                  </span>
+                </div>
 
-                {idUpdateForm.id_image_preview ? (
-                  <div className="relative rounded-2xl border-2 border-blue-400 bg-blue-50/40 p-3 text-center">
-                    <img
-                      src={idUpdateForm.id_image_preview}
-                      alt="New ID Preview"
-                      className="mx-auto max-h-52 w-full object-contain rounded-xl border border-blue-200 shadow-sm"
-                    />
-                    <p className="mt-2 text-xs font-semibold text-blue-700 flex items-center justify-center gap-1">
-                      <Check size={14} /> New photo captured - click Save to apply
-                    </p>
-                    <label className="mt-2.5 inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-800 shadow-sm hover:bg-slate-50">
-                      <Camera size={14} className="text-blue-600" />
-                      Retake Photo
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              setIdUpdateForm({
-                                ...idUpdateForm,
-                                id_image_file: file,
-                                id_image_preview: ev.target.result,
-                              });
-                            };
-                            reader.readAsDataURL(file);
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Front Side Card */}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">1</span>
+                        Front Side of ID
+                      </span>
+                      {idUpdateForm.id_image_preview && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIdUpdateForm({
+                              ...idUpdateForm,
+                              id_image_file: null,
+                              id_image_preview: null,
+                            })
                           }
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : idUpdateForm.existing_id_image_url ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-center">
-                    <div className="relative inline-block">
-                      <img
-                        src={getFullImageUrl(idUpdateForm.existing_id_image_url)}
-                        alt="Current ID"
-                        className="mx-auto max-h-44 w-full object-contain rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:opacity-90 transition"
-                        onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url)}
-                        className="absolute bottom-2 right-2 rounded-lg bg-slate-900/80 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm hover:bg-slate-900 flex items-center gap-1"
-                      >
-                        <Eye size={12} /> View Full
-                      </button>
+                          className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        >
+                          Clear New
+                        </button>
+                      )}
                     </div>
-                    <div className="mt-3 flex items-center justify-center gap-2">
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition">
-                        <Camera size={14} />
-                        Snap New Photo with Phone
+
+                    {idUpdateForm.id_image_preview ? (
+                      <div className="relative rounded-xl border border-blue-300 bg-blue-50/50 p-2 text-center">
+                        <img
+                          src={idUpdateForm.id_image_preview}
+                          alt="Front ID Preview"
+                          className="mx-auto max-h-36 w-full object-contain rounded-lg border border-blue-200 shadow-sm"
+                        />
+                        <p className="mt-1 text-[11px] font-semibold text-blue-700 flex items-center justify-center gap-1">
+                          <Check size={12} /> New Front Captured
+                        </p>
+                        <label className="mt-1.5 inline-flex items-center gap-1 cursor-pointer rounded-lg bg-white border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                          <Camera size={12} className="text-blue-600" /> Retake Front
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  setIdUpdateForm({
+                                    ...idUpdateForm,
+                                    id_image_file: file,
+                                    id_image_preview: ev.target.result,
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ) : idUpdateForm.existing_id_image_url ? (
+                      <div className="relative rounded-xl border border-slate-200 bg-white p-2 text-center">
+                        <img
+                          src={getFullImageUrl(idUpdateForm.existing_id_image_url)}
+                          alt="Current Front ID"
+                          className="mx-auto max-h-36 w-full object-contain rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:opacity-90 transition"
+                          onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url, idUpdateForm.existing_id_image_back_url)}
+                        />
+                        <div className="mt-2 flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url, idUpdateForm.existing_id_image_back_url)}
+                            className="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-slate-900 flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View
+                          </button>
+                          <label className="inline-flex items-center gap-1 cursor-pointer rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-blue-700 transition">
+                            <Camera size={12} /> Replace
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    setIdUpdateForm({
+                                      ...idUpdateForm,
+                                      id_image_file: file,
+                                      id_image_preview: ev.target.result,
+                                    });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white p-5 transition hover:border-blue-400 hover:bg-blue-50/20 text-center">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 mb-2 shadow-sm">
+                          <Camera size={18} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800">
+                          Snap Front Side
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Camera or browse file
+                        </span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1114,44 +1333,143 @@ export default function ReservationsListPage() {
                           }}
                         />
                       </label>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/30 p-6 transition hover:border-blue-500 hover:bg-blue-50/60">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20 mb-3">
-                      <Camera size={24} />
-                    </div>
-                    <span className="text-sm font-bold text-slate-800">
-                      Snap Guest ID with Phone Camera
-                    </span>
-                    <span className="text-xs text-slate-500 text-center mt-1">
-                      Tap here to open mobile camera, or browse file from desktop
-                    </span>
-                    <span className="mt-3 inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-blue-600 shadow-sm">
-                      <Upload size={13} /> Open Camera / Browse
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
+
+                  {/* Back Side Card */}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700">2</span>
+                        Back Side of ID
+                      </span>
+                      {idUpdateForm.id_image_back_preview && (
+                        <button
+                          type="button"
+                          onClick={() =>
                             setIdUpdateForm({
                               ...idUpdateForm,
-                              id_image_file: file,
-                              id_image_preview: ev.target.result,
-                            });
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </label>
-                )}
+                              id_image_back_file: null,
+                              id_image_back_preview: null,
+                            })
+                          }
+                          className="text-[11px] text-rose-600 hover:underline font-semibold"
+                        >
+                          Clear New
+                        </button>
+                      )}
+                    </div>
+
+                    {idUpdateForm.id_image_back_preview ? (
+                      <div className="relative rounded-xl border border-indigo-300 bg-indigo-50/50 p-2 text-center">
+                        <img
+                          src={idUpdateForm.id_image_back_preview}
+                          alt="Back ID Preview"
+                          className="mx-auto max-h-36 w-full object-contain rounded-lg border border-indigo-200 shadow-sm"
+                        />
+                        <p className="mt-1 text-[11px] font-semibold text-indigo-700 flex items-center justify-center gap-1">
+                          <Check size={12} /> New Back Captured
+                        </p>
+                        <label className="mt-1.5 inline-flex items-center gap-1 cursor-pointer rounded-lg bg-white border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                          <Camera size={12} className="text-indigo-600" /> Retake Back
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  setIdUpdateForm({
+                                    ...idUpdateForm,
+                                    id_image_back_file: file,
+                                    id_image_back_preview: ev.target.result,
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ) : idUpdateForm.existing_id_image_back_url ? (
+                      <div className="relative rounded-xl border border-slate-200 bg-white p-2 text-center">
+                        <img
+                          src={getFullImageUrl(idUpdateForm.existing_id_image_back_url)}
+                          alt="Current Back ID"
+                          className="mx-auto max-h-36 w-full object-contain rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:opacity-90 transition"
+                          onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url, idUpdateForm.existing_id_image_back_url)}
+                        />
+                        <div className="mt-2 flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewIdImage(idUpdateForm.existing_id_image_url, idUpdateForm.existing_id_image_back_url)}
+                            className="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-slate-900 flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View
+                          </button>
+                          <label className="inline-flex items-center gap-1 cursor-pointer rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-indigo-700 transition">
+                            <Camera size={12} /> Replace
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    setIdUpdateForm({
+                                      ...idUpdateForm,
+                                      id_image_back_file: file,
+                                      id_image_back_preview: ev.target.result,
+                                    });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white p-5 transition hover:border-indigo-400 hover:bg-indigo-50/20 text-center">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 mb-2 shadow-sm">
+                          <Camera size={18} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800">
+                          Snap Back Side
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Camera or browse file
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setIdUpdateForm({
+                                  ...idUpdateForm,
+                                  id_image_back_file: file,
+                                  id_image_back_preview: ev.target.result,
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Guest Details Edit */}
@@ -1231,25 +1549,28 @@ export default function ReservationsListPage() {
       )}
 
       {/* ====================================================
-          MODAL: FULLSCREEN GUEST ID IMAGE VIEWER
+          MODAL: FULLSCREEN GUEST ID IMAGE VIEWER (FRONT & BACK)
       ==================================================== */}
       {idViewerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
-          <div className="relative max-w-3xl w-full rounded-3xl bg-slate-900 p-4 shadow-2xl text-center">
+          <div className="relative max-w-3xl w-full rounded-3xl bg-slate-900 p-5 shadow-2xl text-center">
+            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-white">
               <span className="text-sm font-bold flex items-center gap-2">
                 <Camera size={16} className="text-blue-400" />
                 Guest Identification Document
               </span>
               <div className="flex items-center gap-2">
-                <a
-                  href={getFullImageUrl(viewingIdImageUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
-                >
-                  Open Original
-                </a>
+                {((viewingSide === "front" ? viewingIdFrontUrl : viewingIdBackUrl) || viewingIdFrontUrl || viewingIdBackUrl) && (
+                  <a
+                    href={getFullImageUrl(viewingSide === "front" ? (viewingIdFrontUrl || viewingIdBackUrl) : (viewingIdBackUrl || viewingIdFrontUrl))}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition"
+                  >
+                    Open Original
+                  </a>
+                )}
                 <button
                   onClick={() => setIdViewerModalOpen(false)}
                   className="rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
@@ -1258,12 +1579,46 @@ export default function ReservationsListPage() {
                 </button>
               </div>
             </div>
-            <div className="py-4 flex items-center justify-center">
-              <img
-                src={getFullImageUrl(viewingIdImageUrl)}
-                alt="Full ID Document"
-                className="max-h-[75vh] w-auto max-w-full rounded-xl object-contain shadow-lg"
-              />
+
+            {/* Toggle Tabs between Front and Back */}
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewingSide("front")}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold transition ${
+                  viewingSide === "front"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                }`}
+              >
+                Front Side {viewingIdFrontUrl ? "✓" : "(None)"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingSide("back")}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold transition ${
+                  viewingSide === "back"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                    : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                }`}
+              >
+                Back Side {viewingIdBackUrl ? "✓" : "(None)"}
+              </button>
+            </div>
+
+            {/* Main Image Display */}
+            <div className="py-4 flex items-center justify-center min-h-[300px]">
+              {(viewingSide === "front" ? viewingIdFrontUrl : viewingIdBackUrl) ? (
+                <img
+                  src={getFullImageUrl(viewingSide === "front" ? viewingIdFrontUrl : viewingIdBackUrl)}
+                  alt={`ID Document ${viewingSide === "front" ? "Front" : "Back"}`}
+                  className="max-h-[70vh] w-auto max-w-full rounded-2xl object-contain shadow-xl border border-slate-800"
+                />
+              ) : (
+                <div className="py-12 text-slate-500 text-sm">
+                  No {viewingSide === "front" ? "Front" : "Back"} ID photo uploaded for this reservation.
+                </div>
+              )}
             </div>
           </div>
         </div>
