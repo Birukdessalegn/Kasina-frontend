@@ -466,19 +466,19 @@ function AppRoutes() {
               />
               <Route
                 path="/finance/expenses"
-                element={<ExpensesPage />}
+                element={<Navigate to="/expenses" replace />}
               />
               <Route
                 path="/finance/purchases"
-                element={<PurchasingPage />}
+                element={<Navigate to="/purchasing" replace />}
               />
               <Route
                 path="/finance/payments"
-                element={<PaymentPage />}
+                element={<Navigate to="/finance/sales" replace />}
               />
               <Route
                 path="/finance/transactions"
-                element={<CashierReconciliationPage />}
+                element={<Navigate to="/finance/cashier-reconciliation" replace />}
               />
               <Route
                 path="/finance/reports"

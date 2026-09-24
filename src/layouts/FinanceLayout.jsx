@@ -17,9 +17,14 @@ import AppHeader from "../layouts/AppHeader";
 
 const menuItems = [
   {
-    name: "Finance Dashboard",
+    name: "Finance Overview",
     path: "/finance",
     icon: Wallet,
+  },
+  {
+    name: "Sales Ledger",
+    path: "/finance/sales",
+    icon: TrendingUp,
   },
   {
     name: "Cashier Reconciliation",
@@ -27,32 +32,7 @@ const menuItems = [
     icon: CreditCard,
   },
   {
-    name: "Sales",
-    path: "/finance/sales",
-    icon: TrendingUp,
-  },
-  {
-    name: "Expenses",
-    path: "/finance/expenses",
-    icon: Receipt,
-  },
-  {
-    name: "Purchases",
-    path: "/finance/purchases",
-    icon: ShoppingCart,
-  },
-  {
-    name: "Payments",
-    path: "/finance/payments",
-    icon: CreditCard,
-  },
-  {
-    name: "Transactions",
-    path: "/finance/transactions",
-    icon: ArrowLeftRight,
-  },
-  {
-    name: "Reports",
+    name: "Financial Reports",
     path: "/finance/reports",
     icon: BarChart3,
   },
@@ -65,43 +45,27 @@ function FinanceLayout() {
 
   const getPageTitle = () => {
     if (location.pathname === "/finance") {
-      return "Finance Dashboard";
+      return "Finance Overview";
     }
 
     if (location.pathname === "/finance/cashier-reconciliation") {
-      return "Cashier Money Reconciliation";
+      return "Cashier Shift Reconciliation";
     }
 
     if (location.pathname === "/finance/sales") {
-      return "Sales";
-    }
-
-    if (location.pathname === "/finance/expenses") {
-      return "Expenses";
-    }
-
-    if (location.pathname === "/finance/purchases") {
-      return "Purchases";
-    }
-
-    if (location.pathname === "/finance/payments") {
-      return "Payments";
-    }
-
-    if (location.pathname === "/finance/transactions") {
-      return "Transactions";
+      return "Sales & Revenue Ledger";
     }
 
     if (location.pathname === "/finance/reports") {
-      return "Financial Reports";
+      return "Financial Statements & Reports";
     }
 
-    return "Finance";
+    return "Hotel Finance";
   };
 
   const getPageDescription = () => {
     if (location.pathname === "/finance") {
-      return "Monitor restaurant financial performance.";
+      return "Executive financial overview, P&L, and hotel revenue breakdown.";
     }
 
     if (location.pathname === "/finance/cashier-reconciliation") {
@@ -109,30 +73,14 @@ function FinanceLayout() {
     }
 
     if (location.pathname === "/finance/sales") {
-      return "Monitor restaurant sales and revenue.";
-    }
-
-    if (location.pathname === "/finance/expenses") {
-      return "Track and manage business expenses.";
-    }
-
-    if (location.pathname === "/finance/purchases") {
-      return "Monitor purchasing costs and supplier payments.";
-    }
-
-    if (location.pathname === "/finance/payments") {
-      return "Track payments and outstanding balances.";
-    }
-
-    if (location.pathname === "/finance/transactions") {
-      return "View financial transactions.";
+      return "Comprehensive sales ledger across hotel room lodging and restaurant/bar POS.";
     }
 
     if (location.pathname === "/finance/reports") {
-      return "Analyze financial performance and generate reports.";
+      return "Income statements, revenue streams, and financial audit reports.";
     }
 
-    return "Manage restaurant finances.";
+    return "Manage hotel finances and accounting.";
   };
 
   return (

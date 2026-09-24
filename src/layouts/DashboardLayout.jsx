@@ -276,17 +276,7 @@ const navigationGroups = [
             icon: CreditCard,
           },
           {
-            name: "Purchases Audit",
-            path: "/finance/purchases",
-            icon: ShoppingBag,
-          },
-          {
-            name: "Expenses",
-            path: "/finance/expenses",
-            icon: Receipt,
-          },
-          {
-            name: "Reports",
+            name: "Financial Reports",
             path: "/finance/reports",
             icon: BarChart3,
           },
