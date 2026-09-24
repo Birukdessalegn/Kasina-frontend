@@ -38,8 +38,9 @@ export default function FinanceDashboardPage() {
   const [purchases, setPurchases] = useState([]);
   const [cashierShifts, setCashierShifts] = useState([]);
 
-  // Timeframe switch: "all" | "today"
+  // Timeframe switch: "today" | "week" | "month" | "all"
   const [timeframe, setTimeframe] = useState("all");
+  const [backendOverview, setBackendOverview] = useState(null);
 
   const fetchFinanceData = useCallback(async (isInitial = false) => {
     try {
@@ -47,6 +48,17 @@ export default function FinanceDashboardPage() {
       else setIsRefreshing(true);
       setError("");
 
+      // 1. Try unified high-performance finance overview endpoint
+      try {
+        const ovRes = await api(`/finance/overview?timeframe=${timeframe}`);
+        if (ovRes?.success && ovRes?.data) {
+          setBackendOverview(ovRes.data);
+        }
+      } catch (ovErr) {
+        console.warn("Server finance overview endpoint pending:", ovErr);
+      }
+
+      // 2. Fetch raw streams in parallel
       const [dashRes, roomsRes, ordersRes, pmtsRes, expRes, purRes, shiftsRes] = await Promise.all([
         api("/dashboard").catch(() => ({})),
         api("/room-reservations").catch(() => ({ data: [] })),
@@ -78,13 +90,13 @@ export default function FinanceDashboardPage() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [timeframe]);
 
   useEffect(() => {
     fetchFinanceData(true);
     let interval;
     if (autoRefresh) {
-      interval = setInterval(() => fetchFinanceData(false), 10000);
+      interval = setInterval(() => fetchFinanceData(false), 15000);
     }
     return () => clearInterval(interval);
   }, [autoRefresh, fetchFinanceData]);
@@ -95,6 +107,43 @@ export default function FinanceDashboardPage() {
   // FINANCIAL METRICS CALCULATION
   // ============================================================
   const metrics = useMemo(() => {
+    // If unified server financial overview is available, use it directly
+    if (backendOverview && backendOverview.summary) {
+      const s = backendOverview.summary;
+      const ch = backendOverview.channels || {};
+      const pm = backendOverview.paymentMethods || {};
+      const pendingShiftVerifications = (cashierShifts || []).filter(
+        (sh) => String(sh.status || sh.verification_status || "pending").toLowerCase() === "pending"
+      ).length;
+
+      const totalPendingFloorTabs = (ch.pos?.totalUnpaid || 0) + (ch.rooms?.totalUnpaid || 0);
+
+      return {
+        wholeHotelLifetimeRevenue: s.totalRevenue,
+        wholeHotelTodayRevenue: s.totalRevenue,
+        totalRoomSales: s.roomRevenue,
+        todayRoomSales: s.roomRevenue,
+        totalPosSales: s.posRevenue,
+        todayPosSales: s.posRevenue,
+        totalPendingFloorTabs,
+        totalHotelPipeline: s.totalRevenue + totalPendingFloorTabs,
+        totalHotelBusinessVolume: s.totalRevenue + totalPendingFloorTabs,
+        totalExpenses: s.totalExpenses,
+        totalPurchases: s.totalPurchases,
+        totalOutflow: s.totalOutflows,
+        totalVat: Math.round((s.totalRevenue / 1.25) * 0.15 * 100) / 100,
+        totalService: Math.round((s.totalRevenue / 1.25) * 0.10 * 100) / 100,
+        netProfit: s.netOperatingIncome,
+        profitMargin: s.profitMargin,
+        activeGrossRevenue: s.totalRevenue,
+        pendingShiftVerifications,
+        totalReservationsCount: ch.rooms?.reservationsCount || (roomReservations || []).length,
+        totalOrdersCount: ch.pos?.ordersCount || (orders || []).length,
+        paymentMethods: pm,
+        expensesByCategory: backendOverview.expensesByCategory || [],
+      };
+    }
+
     const todayStr = new Date().toISOString().split("T")[0];
 
     // 1. ROOM LODGING REVENUE
@@ -198,7 +247,7 @@ export default function FinanceDashboardPage() {
       totalReservationsCount: (roomReservations || []).length,
       totalOrdersCount: (orders || []).length,
     };
-  }, [roomReservations, orders, payments, expenses, purchases, cashierShifts, dashboardStats, timeframe]);
+  }, [backendOverview, roomReservations, orders, payments, expenses, purchases, cashierShifts, dashboardStats, timeframe]);
 
   // Combined Multi-Department Recent Transactions
   const recentTransactions = useMemo(() => {
@@ -312,7 +361,7 @@ export default function FinanceDashboardPage() {
             <button
               type="button"
               onClick={() => setTimeframe("today")}
-              className={`rounded-lg px-3 py-1.5 transition ${
+              className={`rounded-lg px-2.5 sm:px-3 py-1.5 transition ${
                 timeframe === "today"
                   ? "bg-slate-900 text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -322,8 +371,30 @@ export default function FinanceDashboardPage() {
             </button>
             <button
               type="button"
+              onClick={() => setTimeframe("week")}
+              className={`rounded-lg px-2.5 sm:px-3 py-1.5 transition ${
+                timeframe === "week"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeframe("month")}
+              className={`rounded-lg px-2.5 sm:px-3 py-1.5 transition ${
+                timeframe === "month"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              30 Days
+            </button>
+            <button
+              type="button"
               onClick={() => setTimeframe("all")}
-              className={`rounded-lg px-3 py-1.5 transition ${
+              className={`rounded-lg px-2.5 sm:px-3 py-1.5 transition ${
                 timeframe === "all"
                   ? "bg-amber-600 text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
