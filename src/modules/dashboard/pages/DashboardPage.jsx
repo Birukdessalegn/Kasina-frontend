@@ -47,7 +47,7 @@ export default function DashboardPage() {
         api("/dashboard").catch((err) => ({ success: false, message: err.message })),
         api("/pos/orders").catch(() => api("/orders").catch(() => ({}))),
         api("/expenses").catch(() => ({})),
-        api("/frontdesk/reservations").catch(() => api("/reservations").catch(() => ({}))),
+        api("/room-reservations").catch(() => ({})),
       ]);
 
       console.log("Dashboard live response:", response);
@@ -247,67 +247,6 @@ export default function DashboardPage() {
   }, [dashboard]);
 
   // ============================================================
-  // LOADING
-  // ============================================================
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-500">
-          <RefreshCw className="h-5 w-5 animate-spin" />
-
-          <span className="text-sm">
-            Loading dashboard...
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // ============================================================
-  // ERROR
-  // ============================================================
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Dashboard
-          </h1>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Welcome back. Here's what's happening in
-            your restaurant and bar today.
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-red-800">
-                Failed to load dashboard
-              </h2>
-
-              <p className="mt-1 text-sm text-red-600">
-                {error}
-              </p>
-            </div>
-
-            <button
-              onClick={handleRefresh}
-              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ============================================================
   // TIMEFRAME FILTERING HELPER & AGGREGATED METRICS
   // ============================================================
 
@@ -443,6 +382,68 @@ export default function DashboardPage() {
       activeExpensesAmount,
     };
   }, [orders, reservations, expenses, dashboard, timeframe]);
+
+  // ============================================================
+  // LOADING
+  // ============================================================
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-500">
+          <RefreshCw className="h-5 w-5 animate-spin" />
+
+          <span className="text-sm">
+            Loading dashboard...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // ERROR
+  // ============================================================
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Dashboard
+          </h1>
+
+          <p className="mt-1 text-sm text-gray-500">
+            Welcome back. Here's what's happening in
+            your restaurant and bar today.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-red-800">
+                Failed to load dashboard
+              </h2>
+
+              <p className="mt-1 text-sm text-red-600">
+                {error}
+              </p>
+            </div>
+
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   const activeTables = Number(dashboard?.active_tables || 0);
   const pendingKitchenOrders = Number(dashboard?.pending_kitchen_orders || 0);
