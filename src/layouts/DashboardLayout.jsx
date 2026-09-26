@@ -117,11 +117,6 @@ const navigationGroups = [
             path: "/employees/attendance",
             icon: Clock,
           },
-          {
-            name: "Leave Management",
-            path: "/employees/leave",
-            icon: CalendarDays,
-          },
         ],
       },
 
@@ -349,6 +344,11 @@ const navigationGroups = [
             name: "Attendance Log",
             path: "/employees/attendance",
             icon: Clock,
+          },
+          {
+            name: "Leave Management",
+            path: "/employees/leave",
+            icon: CalendarDays,
           },
           {
             name: "Payroll Management",
