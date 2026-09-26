@@ -257,7 +257,13 @@ function EmployeesPage() {
       ]);
 
       if (outRes?.outlets) setOutletsList(outRes.outlets);
-      if (posRes?.positions) setPositionsList(posRes.positions);
+      if (posRes?.positions) {
+          const cleaned = posRes.positions.map((p) => ({
+            ...p,
+            title: p.title?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist") || p.title,
+          }));
+          setPositionsList(cleaned);
+        }
       if (roleRes?.roles) setRolesList(roleRes.roles);
       if (deptRes?.departments) setDepartmentsList(deptRes.departments);
 
@@ -1438,11 +1444,14 @@ function EmployeesPage() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                     >
                       <option value="">Select official position (optional)</option>
-                      {positionsList.map((pos) => (
-                        <option key={pos.id} value={pos.id}>
-                          {pos.title} {pos.department_name ? `(${pos.department_name})` : ""}
-                        </option>
-                      ))}
+                      {positionsList.map((pos) => {
+                        const displayTitle = pos.title?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist") || pos.title;
+                        return (
+                          <option key={pos.id} value={pos.id}>
+                            {displayTitle} {pos.department_name ? `(${pos.department_name})` : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
