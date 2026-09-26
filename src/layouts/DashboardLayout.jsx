@@ -1,3 +1,4 @@
+import UserProfileModal from "../components/UserProfileModal";
 import { useState, useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -1586,12 +1587,15 @@ function DashboardLayout() {
 
                   <div className="py-1">
 
-                    <button className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
-
+                    <button
+                      onClick={() => {
+                        setShowProfileModal(true);
+                        setIsProfileOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+                    >
                       <User className="h-4 w-4 text-slate-400" />
-
                       My Profile
-
                     </button>
 
                     <button className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">

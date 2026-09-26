@@ -4,6 +4,9 @@ import {
   Banknote,
   CreditCard,
   Smartphone,
+  Landmark,
+  Copy,
+  Check,
   Camera,
   Upload,
   CheckCircle2,
@@ -31,6 +34,48 @@ function PaymentModal({
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
   const [receiptImage, setReceiptImage] = useState(null);
+
+  // Hotel Receiving Accounts for Mobile & Card Payments
+  const [paymentAccounts, setPaymentAccounts] = useState([]);
+  const [copiedAccId, setCopiedAccId] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPaymentAccounts = async () => {
+      try {
+        const res = await api("/payment-accounts?active=true");
+        const list = res.accounts || res.data || [];
+        if (isMounted && Array.isArray(list) && list.length > 0) {
+          setPaymentAccounts(list);
+          return;
+        }
+      } catch (err) {
+        console.warn("Could not fetch remote payment accounts, using cache:", err);
+      }
+      try {
+        const cached = localStorage.getItem("kasina_payment_accounts");
+        if (cached && isMounted) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setPaymentAccounts(parsed.filter((a) => a.is_active));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchPaymentAccounts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleCopyAccount = (acc) => {
+    if (!acc?.account_number) return;
+    navigator.clipboard.writeText(acc.account_number);
+    setCopiedAccId(acc.id);
+    setTimeout(() => setCopiedAccId(null), 2000);
+  };
 
   // Special Person / VIP Credit Tab State
   const [customerName, setCustomerName] = useState("");

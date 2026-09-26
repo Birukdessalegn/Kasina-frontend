@@ -1,3 +1,4 @@
+import UserProfileModal from "../components/UserProfileModal";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ShoppingCart,

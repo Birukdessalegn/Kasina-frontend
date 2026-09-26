@@ -14,11 +14,13 @@ import {
   Sparkles,
   ArrowUpRight,
   Radio,
+  Landmark,
   BedDouble,
 } from "lucide-react";
 import api from "../../../services/api";
 import SmoothMonthlyRevenueChart from "../components/SmoothMonthlyRevenueChart";
 import DashboardBarChart from "../components/DashboardBarChart";
+import PaymentAccountsModal from "../components/PaymentAccountsModal";
 
 export default function DashboardPage() {
   const [dashboard, setDashboard] = useState(null);
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [showAccountsModal, setShowAccountsModal] = useState(false);
 
   // ============================================================
   // FETCH DASHBOARD SUMMARY (WITH BACKGROUND LIVE REFRESH)
@@ -566,6 +569,17 @@ export default function DashboardPage() {
             </button>
           </div>
 
+                    {/* Add Payment / Transfer Accounts button */}
+          <button
+            type="button"
+            onClick={() => setShowAccountsModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-extrabold transition shadow-xs cursor-pointer"
+            title="Configure hotel bank accounts and Telebirr for Card & Mobile payments"
+          >
+            <Landmark className="h-4 w-4" />
+            Add Account
+          </button>
+
           {/* Live Auto Refresh Toggle */}
           <button
             type="button"
@@ -786,6 +800,15 @@ export default function DashboardPage() {
       ====================================================== */}
 
       <ItemizedRevenueSection dashboard={dashboard} formatMoney={formatMoney} />
+      {/* ============================================================
+          PAYMENT / TRANSFER ACCOUNTS MODAL
+      ============================================================ */}
+      {showAccountsModal && (
+        <PaymentAccountsModal
+          isOpen={showAccountsModal}
+          onClose={() => setShowAccountsModal(false)}
+        />
+      )}
     </div>
   );
 }
