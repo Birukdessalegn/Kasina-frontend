@@ -6,10 +6,13 @@ import { startShift } from '../services/posApi';
 function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
   const { user } = useAuth();
   const roleUpper = (user?.role || '').toUpperCase();
-  const initialOutletId =
-    user?.outletId ||
-    user?.outlet_id ||
-    (roleUpper.includes('CAFE') || roleUpper === 'BARISTA' ? 2 : roleUpper === 'BARTENDER' ? 3 : 4);
+  const userOutletCode = (user?.outletCode || user?.outlet_code || '').toUpperCase();
+  const userPosition = (user?.position_title || user?.position || '').toLowerCase();
+  const isCafeCashier = userOutletCode === 'CAFE' || userPosition.includes('cafe') || roleUpper.includes('CAFE');
+  const isBarRestCashier = userOutletCode === 'BAR_RESTAURANT' || userPosition.includes('bar') || userPosition.includes('restaurant') || roleUpper.includes('BAR');
+  const isManagerOrAdmin = ['ADMIN', 'HOTEL_MANAGER', 'ACCOUNTANT_MANAGER', 'COOPERATIVE_MANAGER', 'MANAGER'].includes(roleUpper);
+
+  const initialOutletId = isCafeCashier ? 2 : isBarRestCashier ? 4 : (user?.outletId || user?.outlet_id || 4);
 
   const [openingCash, setOpeningCash] = useState('');
   const [selectedOutletId, setSelectedOutletId] = useState(initialOutletId);
@@ -68,8 +71,14 @@ function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
         <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
           <div className="flex justify-between">
             <span className="font-medium text-slate-500">Cashier:</span>
-            <span className="font-bold text-slate-800">{cashierName || 'Current User'}</span>
+            <span className="font-bold text-slate-800">{cashierName || 'Current User'} {userPosition ? `(${user?.position_title || user?.position})` : ''}</span>
           </div>
+          {user?.supervisor_name && (
+            <div className="flex justify-between">
+              <span className="font-medium text-slate-500">Reporting Supervisor:</span>
+              <span className="font-semibold text-indigo-700">{user.supervisor_name}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="font-medium text-slate-500">Time:</span>
             <span className="font-semibold text-slate-700">{new Date().toLocaleTimeString()}</span>
@@ -89,46 +98,58 @@ function ShiftStartModal({ isOpen, onClose, onShiftStarted, cashierName }) {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
               Operating Station / Venue
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedOutletId(4)}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
-                  selectedOutletId === 4
-                    ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Utensils className="h-4 w-4 mb-1 text-blue-600" />
-                <span>Restaurant</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedOutletId(3)}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
-                  selectedOutletId === 3
-                    ? 'border-amber-600 bg-amber-50 text-amber-800 ring-2 ring-amber-500/20 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Wine className="h-4 w-4 mb-1 text-amber-600" />
-                <span>Main Bar</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedOutletId(2)}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
-                  selectedOutletId === 2
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Coffee className="h-4 w-4 mb-1 text-emerald-600" />
-                <span>Cafe & Bakery</span>
-              </button>
-            </div>
+            {!isManagerOrAdmin && (isCafeCashier || isBarRestCashier) ? (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs font-bold text-indigo-900 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  {isCafeCashier ? <Coffee className="h-4 w-4 text-emerald-600" /> : <Utensils className="h-4 w-4 text-blue-600" />}
+                  {isCafeCashier ? 'Cafe & Bakery Cashier Station' : 'Bar & Restaurant Cashier Station'}
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-200/60 px-2 py-0.5 rounded text-indigo-800">
+                  Locked
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOutletId(4)}
+                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                    selectedOutletId === 4
+                      ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20 shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Utensils className="h-4 w-4 mb-1 text-blue-600" />
+                  <span>Restaurant & Bar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOutletId(3)}
+                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                    selectedOutletId === 3
+                      ? 'border-amber-600 bg-amber-50 text-amber-800 ring-2 ring-amber-500/20 shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Wine className="h-4 w-4 mb-1 text-amber-600" />
+                  <span>Main Bar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOutletId(2)}
+                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition ${
+                    selectedOutletId === 2
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20 shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Coffee className="h-4 w-4 mb-1 text-emerald-600" />
+                  <span>Cafe & Bakery</span>
+                </button>
+              </div>
+            )}
             <p className="mt-1 text-[11px] text-slate-400">
-              Menu items, categories, and tables will adapt to this venue for your shift.
+              Menu items, categories, and tables will adapt strictly to this station.
             </p>
           </div>
 

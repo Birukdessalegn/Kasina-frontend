@@ -68,9 +68,12 @@ function POSPage() {
     user?.role_id === 1 ||
     user?.role_id === 2;
 
-  const canSwitchVenue = isManagerOrAdmin || (isCashier && !effectiveOutletCode) || (!isCafeActor && !isBartender && !isRestaurantActor);
+  const userPosition = (user?.position_title || user?.position || "").toLowerCase();
+  const isCafeCashier = userRoleUpper.includes("CAFE") || userPosition.includes("cafe") || effectiveOutletCode === "CAFE";
+  const isBarRestCashier = userPosition.includes("bar") || userPosition.includes("restaurant") || effectiveOutletCode === "BAR_RESTAURANT" || effectiveOutletCode === "RESTAURANT";
+  const canSwitchVenue = isManagerOrAdmin;
 
-  const initialVenue = isCafeActor ? "cafe" : isBartender ? "bar" : isRestaurantActor ? "restaurant" : "all";
+  const initialVenue = isCafeCashier ? "cafe" : isBarRestCashier ? "restaurant" : isCafeActor ? "cafe" : isBartender ? "bar" : isRestaurantActor ? "restaurant" : "all";
   const [activeVenue, setActiveVenue] = useState(initialVenue);
   const [activeCategory, setActiveCategory] = useState("all");
 

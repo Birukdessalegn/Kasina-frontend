@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   DollarSign,
+  Coffee,
+  Utensils,
   CreditCard,
   AlertTriangle,
   CheckCircle2,
@@ -22,6 +24,7 @@ function CashierReconciliationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [stationFilter, setStationFilter] = useState("all"); // "all" | "cafe" | "bar_restaurant"
   const [searchQuery, setSearchQuery] = useState("");
 
   /* Verification Modal */
@@ -69,6 +72,11 @@ function CashierReconciliationPage() {
       // Map real database shift rows
       const formatted = rawShifts.map((s) => ({
         id: s.id ?? s.shift_id,
+        outlet_id: s.outlet_id,
+        outlet_code: s.outlet_code,
+        outlet_name: s.outlet_name,
+        position_title: s.position_title,
+        supervisor_name: s.supervisor_name,
         cashier_name:
           s.cashier_name ||
           s.user_name ||
