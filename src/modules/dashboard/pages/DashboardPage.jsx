@@ -199,34 +199,14 @@ export default function DashboardPage() {
       return sum + Number(o.total_amount || o.total || o.grand_total || 0);
     }, 0);
 
-    const posSalesAllTime = Math.max(
-      posPaidTotal,
-      Number(
-        dashboard?.all_time_sales ||
-        dashboard?.total_sales ||
-        dashboard?.total_revenue ||
-        0
-      )
-    );
-
     const roomPaidTotal = (reservations || []).reduce((sum, r) => {
-      return sum + Number(r.paid_amount || r.total_amount || 0);
+      return sum + Number(r.paid_amount || (r.payment_status === "paid" ? r.total_amount : 0) || 0);
     }, 0);
 
-    const roomSalesAllTime = Math.max(
-      roomPaidTotal,
-      Number(dashboard?.room_sales_all_time || 0)
-    );
-
-    const grossRevenue = Math.max(
-      posSalesAllTime + roomSalesAllTime,
-      Number(
-        dashboard?.grand_total_revenue ||
-        dashboard?.total_revenue ||
-        dashboard?.today_sales ||
-        0
-      )
-    );
+    const verifiedTotal = posPaidTotal + roomPaidTotal;
+    const grossRevenue = verifiedTotal > 0
+      ? verifiedTotal
+      : Number(dashboard?.grand_total_revenue || dashboard?.total_revenue || dashboard?.today_sales || 0);
 
     const totalExpenses =
       (expenses || []).reduce((sum, e) => {

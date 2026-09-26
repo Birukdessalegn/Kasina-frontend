@@ -107,121 +107,88 @@ export default function FinanceDashboardPage() {
   // FINANCIAL METRICS CALCULATION
   // ============================================================
   const metrics = useMemo(() => {
-    // If unified server financial overview is available, use it directly
-    if (backendOverview && backendOverview.summary) {
-      const s = backendOverview.summary;
-      const ch = backendOverview.channels || {};
-      const pm = backendOverview.paymentMethods || {};
-      const pendingShiftVerifications = (cashierShifts || []).filter(
-        (sh) => String(sh.status || sh.verification_status || "pending").toLowerCase() === "pending"
-      ).length;
-
-      const totalPendingFloorTabs = (ch.pos?.totalUnpaid || 0) + (ch.rooms?.totalUnpaid || 0);
-
-      return {
-        wholeHotelLifetimeRevenue: s.totalRevenue,
-        wholeHotelTodayRevenue: s.totalRevenue,
-        totalRoomSales: s.roomRevenue,
-        todayRoomSales: s.roomRevenue,
-        totalPosSales: s.posRevenue,
-        todayPosSales: s.posRevenue,
-        totalPendingFloorTabs,
-        totalHotelPipeline: s.totalRevenue + totalPendingFloorTabs,
-        totalHotelBusinessVolume: s.totalRevenue + totalPendingFloorTabs,
-        totalExpenses: s.totalExpenses,
-        totalPurchases: s.totalPurchases,
-        totalOutflow: s.totalOutflows,
-        totalVat: Math.round((s.totalRevenue / 1.25) * 0.15 * 100) / 100,
-        totalService: Math.round((s.totalRevenue / 1.25) * 0.10 * 100) / 100,
-        netProfit: s.netOperatingIncome,
-        profitMargin: s.profitMargin,
-        activeGrossRevenue: s.totalRevenue,
-        pendingShiftVerifications,
-        totalReservationsCount: ch.rooms?.reservationsCount || (roomReservations || []).length,
-        totalOrdersCount: ch.pos?.ordersCount || (orders || []).length,
-        paymentMethods: pm,
-        expensesByCategory: backendOverview.expensesByCategory || [],
-      };
-    }
-
     const todayStr = new Date().toISOString().split("T")[0];
 
-    // 1. ROOM LODGING REVENUE
-    const totalRoomSales = Math.max(
-      (roomReservations || []).reduce((sum, r) => sum + Number(r.paid_amount || r.total_amount || 0), 0),
-      Number(dashboardStats?.room_sales_all_time || 0)
+    // 1. REAL VERIFIED ROOM LODGING REVENUE
+    const verifiedRoomSales = (roomReservations || []).reduce(
+      (sum, r) => sum + Number(r.paid_amount || (r.payment_status === "paid" ? r.total_amount : 0) || 0),
+      0
     );
-
-    const todayRoomSales = (roomReservations || []).reduce((sum, r) => {
+    const verifiedTodayRoomSales = (roomReservations || []).reduce((sum, r) => {
       const d = r.created_at || r.check_in_date;
       if (!d) return sum;
-      return String(d).split(/[T ]/)[0] === todayStr ? sum + Number(r.paid_amount || r.total_amount || 0) : sum;
+      return String(d).split(/[T ]/)[0] === todayStr
+        ? sum + Number(r.paid_amount || (r.payment_status === "paid" ? r.total_amount : 0) || 0)
+        : sum;
     }, 0);
 
-    // 2. RESTAURANT & BAR POS SETTLED SALES
-    const totalPosSales = Math.max(
-      (payments || []).reduce((sum, p) => {
-        const st = String(p.status || "").toLowerCase();
-        return (st === "paid" || st === "completed" || !st) ? sum + Number(p.amount || 0) : sum;
-      }, 0),
-      Number(dashboardStats?.pos_sales_all_time || 0)
-    );
+    // 2. REAL VERIFIED RESTAURANT & BAR POS SETTLED SALES
+    const verifiedPosPaid = (payments || []).reduce((sum, p) => {
+      const st = String(p.status || "").toLowerCase();
+      return (st === "paid" || st === "completed" || !st) ? sum + Number(p.amount || 0) : sum;
+    }, 0);
+    const verifiedOrdersPaid = (orders || []).reduce((sum, o) => {
+      const st = String(o.status || "").toLowerCase();
+      const paySt = String(o.payment_status || "").toLowerCase();
+      return (st === "completed" || st === "paid" || paySt === "paid" || o.is_paid === true)
+        ? sum + Number(o.total_amount || o.total || 0)
+        : sum;
+    }, 0);
+    const verifiedPosSales = Math.max(verifiedPosPaid, verifiedOrdersPaid);
 
-    const todayPosSales = Math.max(
-      (payments || []).reduce((sum, p) => {
-        const d = p.paid_at || p.created_at || p.date;
-        if (!d) return sum + Number(p.amount || 0);
-        return String(d).split(/[T ]/)[0] === todayStr ? sum + Number(p.amount || 0) : sum;
-      }, 0),
-      Number(dashboardStats?.today_pos_sales || dashboardStats?.today_sales || 0)
-    );
+    const verifiedTodayPosSales = (payments || []).reduce((sum, p) => {
+      const d = p.paid_at || p.created_at || p.date;
+      if (!d) return sum + Number(p.amount || 0);
+      return String(d).split(/[T ]/)[0] === todayStr ? sum + Number(p.amount || 0) : sum;
+    }, 0);
 
-    // 3. WHOLE HOTEL GRAND TOTAL
-    const wholeHotelLifetimeRevenue = Math.max(
-      totalRoomSales + totalPosSales,
-      Number(dashboardStats?.grand_total_revenue || dashboardStats?.all_time_sales || 0)
-    );
+    // UNPAID FLOOR TABS
+    const totalPendingFloorTabs = (orders || []).reduce((sum, o) => {
+      const st = String(o.status || "").toLowerCase();
+      const paySt = String(o.payment_status || "").toLowerCase();
+      if (st === "cancelled" || st === "void" || st === "completed" || paySt === "paid" || o.is_paid === true) {
+        return sum;
+      }
+      return sum + Number(o.total_amount || o.total || 0);
+    }, 0);
 
-    const wholeHotelTodayRevenue = Math.max(
-      todayRoomSales + todayPosSales,
-      Number(dashboardStats?.grand_today_revenue || dashboardStats?.today_sales || 0)
-    );
-
-    // 4. ACTIVE FLOOR UNPAID TABS
-    const totalPendingFloorTabs = Math.max(
-      (orders || []).reduce((sum, o) => {
-        const st = String(o.status || "").toLowerCase();
-        const paySt = String(o.payment_status || "").toLowerCase();
-        if (st === "cancelled" || st === "void" || st === "completed" || paySt === "paid" || o.is_paid === true) {
-          return sum;
-        }
-        return sum + Number(o.total_amount || o.total || 0);
-      }, 0),
-      Number(dashboardStats?.active_orders_amount || 0)
-    );
-
-    // 5. TOTAL HOTEL BUSINESS VOLUME / PIPELINE (Settled Revenue + Unsettled Floor Tabs)
-    const totalHotelPipeline = wholeHotelLifetimeRevenue + totalPendingFloorTabs;
-
-    // 6. OPERATING OUTFLOW (EXPENSES + PURCHASES)
+    // EXPENSES & PURCHASES
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + Number(e.amount || e.total || 0), 0);
     const todayExpenses = (expenses || []).reduce((sum, e) => {
       const d = e.date || e.created_at || e.expense_date;
       return String(d).split(/[T ]/)[0] === todayStr ? sum + Number(e.amount || 0) : sum;
     }, 0);
-
     const totalPurchases = (purchases || []).reduce((sum, p) => sum + Number(p.total_amount || p.total || 0), 0);
     const totalOutflow = totalExpenses + totalPurchases;
 
-    // 7. TAX & NET PROFIT
+    // Determine final Room and POS totals (using verified items whenever present)
+    const totalRoomSales = verifiedRoomSales > 0
+      ? verifiedRoomSales
+      : (backendOverview?.summary?.roomRevenue || Number(dashboardStats?.room_sales_all_time || 0));
+
+    const todayRoomSales = verifiedTodayRoomSales;
+
+    const totalPosSales = verifiedPosSales > 0
+      ? verifiedPosSales
+      : (backendOverview?.summary?.posRevenue || Number(dashboardStats?.pos_sales_all_time || 0));
+
+    const todayPosSales = verifiedTodayPosSales > 0
+      ? verifiedTodayPosSales
+      : Number(dashboardStats?.today_pos_sales || dashboardStats?.today_sales || 0);
+
+    // WHOLE HOTEL GRAND TOTALS (Rooms + POS)
+    const wholeHotelLifetimeRevenue = totalRoomSales + totalPosSales;
+    const wholeHotelTodayRevenue = todayRoomSales + todayPosSales;
+    const totalHotelPipeline = wholeHotelLifetimeRevenue + totalPendingFloorTabs;
+
+    // TAXES & PROFIT
     const activeGrossRevenue = timeframe === "today" ? wholeHotelTodayRevenue : wholeHotelLifetimeRevenue;
     const activeOutflow = timeframe === "today" ? todayExpenses : totalOutflow;
-
     const totalVat = Math.round((activeGrossRevenue / 1.25) * 0.15 * 100) / 100;
     const totalService = Math.round((activeGrossRevenue / 1.25) * 0.10 * 100) / 100;
     const netProfit = Math.max(activeGrossRevenue - totalVat - totalService - activeOutflow, 0);
+    const profitMargin = activeGrossRevenue > 0 ? parseFloat(((netProfit / activeGrossRevenue) * 100).toFixed(1)) : 0;
 
-    // 8. CASHIER DRAWER AUDIT STATS
     const pendingShiftVerifications = (cashierShifts || []).filter(
       (s) => String(s.status || s.verification_status || "pending").toLowerCase() === "pending"
     ).length;
@@ -242,12 +209,15 @@ export default function FinanceDashboardPage() {
       totalVat,
       totalService,
       netProfit,
+      profitMargin,
       activeGrossRevenue,
       pendingShiftVerifications,
       totalReservationsCount: (roomReservations || []).length,
       totalOrdersCount: (orders || []).length,
+      paymentMethods: backendOverview?.paymentMethods || {},
+      expensesByCategory: backendOverview?.expensesByCategory || [],
     };
-  }, [backendOverview, roomReservations, orders, payments, expenses, purchases, cashierShifts, dashboardStats, timeframe]);
+  }, [backendOverview, cashierShifts, roomReservations, orders, payments, dashboardStats, expenses, purchases, timeframe]);
 
   // Combined Multi-Department Recent Transactions
   const recentTransactions = useMemo(() => {
