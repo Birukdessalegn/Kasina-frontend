@@ -411,7 +411,7 @@ function EmployeesPage() {
         [name]: value,
       };
 
-      // Auto-suggest default role and department if user selects a position
+      // Auto-suggest default role, department, and workstation outlet if user selects a position
       if (name === "positionId" && value) {
         const foundPos = positionsList.find((p) => String(p.id) === String(value));
         if (foundPos) {
@@ -420,6 +420,19 @@ function EmployeesPage() {
           }
           if (foundPos.department_id) {
             updated.departmentId = String(foundPos.department_id);
+          }
+          const pTitle = (foundPos.title || "").toLowerCase();
+          const pCode = (foundPos.code || "").toLowerCase();
+          if (pTitle.includes("cafe") || pCode.includes("cafe")) {
+            const cafeOutlet = outletsList.find((o) => (o.code || "").toLowerCase() === "cafe" || (o.name || "").toLowerCase() === "cafe");
+            if (cafeOutlet) updated.outletId = String(cafeOutlet.id);
+          } else if (pTitle.includes("bar & restaurant") || pCode.includes("bar_rest")) {
+            const barRestOutlet = outletsList.find(
+              (o) =>
+                (o.code || "").toLowerCase() === "bar_restaurant" ||
+                (o.name || "").toLowerCase().includes("bar & restaurant")
+            );
+            if (barRestOutlet) updated.outletId = String(barRestOutlet.id);
           }
         }
       }
