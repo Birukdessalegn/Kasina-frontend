@@ -194,7 +194,7 @@ export default function FrontDeskPage() {
       const [roomsRes, typesRes, statsRes] = await Promise.all([
         getRooms(),
         getRoomTypes(),
-        getRoomStats()().catch(() => ({ data: [] })),
+        getRoomStats().catch(() => ({ data: {} })),
       ]);
       setRooms(roomsRes.data || []);
       setRoomTypes(typesRes.data || []);
