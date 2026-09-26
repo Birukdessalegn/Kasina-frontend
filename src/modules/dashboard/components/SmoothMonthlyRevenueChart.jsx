@@ -5,12 +5,33 @@ export default function SmoothMonthlyRevenueChart({
   dashboardStats,
   orders = [],
   expenses = [],
+  reservations = [],
   metrics = {},
   formatMoney = (v) => `${Number(v || 0).toLocaleString()} ETB`,
   externalTimeframe,
 }) {
   const [chartTimeframe, setChartTimeframe] = useState("monthly"); // "daily" | "weekly" | "monthly"
   const [activeIdx, setActiveIdx] = useState(0);
+
+  // Auto-focus peak day if active day has 0 income
+  useEffect(() => {
+    if (trendData && trendData.length > 0) {
+      const currentPoint = trendData[activeIdx];
+      if (!currentPoint || currentPoint.income === 0) {
+        let maxIdx = 0;
+        let maxVal = 0;
+        trendData.forEach((pt, idx) => {
+          if (pt.income > maxVal) {
+            maxVal = pt.income;
+            maxIdx = idx;
+          }
+        });
+        if (maxVal > 0) {
+          setActiveIdx(maxIdx);
+        }
+      }
+    }
+  }, [trendData]);
 
   useEffect(() => {
     if (externalTimeframe === "today") {
@@ -88,6 +109,25 @@ export default function SmoothMonthlyRevenueChart({
       });
     }
 
+    // 1b. Group room reservations
+    if (Array.isArray(reservations) && reservations.length > 0) {
+      reservations.forEach((res) => {
+        if (res.status !== "cancelled") {
+          const dateStr = res.created_at || res.check_in || res.checkInDate;
+          if (dateStr) {
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+              const key = getPeriodKey(d);
+              const amt = Number(res.total_price || res.total_amount || res.price || 0);
+              if (valMap[key] !== undefined) {
+                valMap[key] += amt;
+              }
+            }
+          }
+        }
+      });
+    }
+
     // 2. Or fallback to dashboardStats sales_chart
     const hasOrderData = Object.values(valMap).some((v) => v > 0);
     if (!hasOrderData && dashboardStats) {
@@ -147,7 +187,7 @@ export default function SmoothMonthlyRevenueChart({
         y,
       };
     });
-  }, [orders, dashboardStats, chartTimeframe, baseRevenue]);
+  }, [orders, reservations, dashboardStats, chartTimeframe, baseRevenue]);
 
   const activePoint =
     trendData[activeIdx] ||
@@ -251,7 +291,7 @@ export default function SmoothMonthlyRevenueChart({
                 : "Average Monthly Income"}
             </p>
             <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-              {formatMoney(baseRevenue)}
+              {formatMoney(trendData.reduce((s, p) => s + (p.income || 0), 0) || baseRevenue)}
             </p>
 
             <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-100/90 px-3 py-1 text-xs font-extrabold text-emerald-800 border border-emerald-300">
