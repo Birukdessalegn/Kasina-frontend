@@ -757,6 +757,7 @@ export default function DashboardPage() {
             dashboardStats={dashboard}
             orders={orders}
             expenses={expenses}
+            reservations={reservations}
             metrics={metrics}
             formatMoney={formatMoney}
             externalTimeframe={timeframe}

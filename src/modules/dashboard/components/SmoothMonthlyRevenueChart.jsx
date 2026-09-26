@@ -83,19 +83,28 @@ export default function SmoothMonthlyRevenueChart({
     // 2. Process Room Reservations (Accommodations)
     if (Array.isArray(reservations) && reservations.length > 0) {
       reservations.forEach((res) => {
-        const isCompleted =
-          res.status === "checked_out" ||
-          res.status === "confirmed" ||
-          res.status === "checked_in" ||
-          res.payment_status === "paid";
+        const isNotCancelled = res.status !== "cancelled";
 
-        if (isCompleted) {
-          const dateStr = res.created_at || res.check_in_date || res.checkInDate || res.check_out_date;
+        if (isNotCancelled) {
+          const dateStr =
+            res.created_at ||
+            res.check_in_date ||
+            res.check_in ||
+            res.checkInDate ||
+            res.check_out_date ||
+            res.createdAt;
           if (dateStr) {
             const d = new Date(dateStr);
             if (!isNaN(d.getTime())) {
               const key = getPeriodKey(d);
-              const amt = Number(res.total_price || res.totalPrice || res.room_rate || 0);
+              const amt = Number(
+                res.total_price ||
+                res.total_amount ||
+                res.totalPrice ||
+                res.room_rate ||
+                res.price ||
+                0
+              );
               if (periodRevenueMap[key] !== undefined) {
                 periodRevenueMap[key] += amt;
                 if (amt > 0) hasActualData = true;
