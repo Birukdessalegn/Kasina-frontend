@@ -84,8 +84,7 @@ export default function ReservationHistoryPage() {
         const matchesPhone = r.guest_phone?.toLowerCase().includes(q);
         const matchesCode = r.reservation_code?.toLowerCase().includes(q);
         const matchesRoom = r.room_number?.toLowerCase().includes(q);
-        const matchesVip = r.vip_name?.toLowerCase().includes(q) || r.vip_company?.toLowerCase().includes(q);
-        if (!matchesName && !matchesPhone && !matchesCode && !matchesRoom && !matchesVip) {
+        if (!matchesName && !matchesPhone && !matchesCode && !matchesRoom) {
           return false;
         }
       }
@@ -256,7 +255,7 @@ export default function ReservationHistoryPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search guest, code, room, VIP..."
+            placeholder="Search guest, code, room..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full sm:w-64 rounded-xl border border-slate-200 pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500"
@@ -307,15 +306,11 @@ export default function ReservationHistoryPage() {
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">{res.guest_name}</span>
-                        {res.vip_tier && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-extrabold text-purple-900 border border-purple-200">
-                            👑 {res.vip_tier}
-                          </span>
-                        )}
+                        
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                         {res.guest_phone && <span>{res.guest_phone}</span>}
-                        {res.vip_company && <span>• {res.vip_company}</span>}
+                        
                       </div>
                       {res.id_image_url && (
                         <button
@@ -438,12 +433,7 @@ export default function ReservationHistoryPage() {
                     <span className="font-medium text-slate-800">{selectedStay.guest_phone}</span>
                   </div>
                 )}
-                {selectedStay.vip_tier && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">VIP Status:</span>
-                    <span className="font-extrabold text-purple-700">👑 {selectedStay.vip_tier}</span>
-                  </div>
-                )}
+                
                 <div className="flex justify-between">
                   <span className="text-slate-500">Room:</span>
                   <span className="font-bold text-slate-900">

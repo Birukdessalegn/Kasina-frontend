@@ -69,23 +69,14 @@ export const isRestaurantTable = (table) => {
 };
 
 // Helper to determine if a table is VIP
-export const isVipTable = (table) => {
-  if (!table) return false;
-  return (
-    table.type === "vip" ||
-    table.section === "VIP" ||
-    table.is_vip === true ||
-    String(table.location || "").toLowerCase().includes("vip") ||
-    String(table.table_number || table.tableNumber || "").toLowerCase().startsWith("vip")
-  );
-};
+export const isVipTable = () => false;
 
 function TablesPage() {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [activeTab, setActiveTab] = useState("ALL"); // ALL | CAFE | BAR | RESTAURANT | VIP
+  const [activeTab, setActiveTab] = useState("ALL"); // ALL | CAFE | BAR | RESTAURANT
   const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
@@ -497,18 +488,7 @@ function TablesPage() {
             Restaurant ({metrics.restaurantCount})
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("VIP")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-              activeTab === "VIP"
-                ? "bg-purple-600 text-white shadow-2xs"
-                : "text-purple-800 hover:bg-purple-100/60"
-            }`}
-          >
-            <Crown className="h-3 w-3" />
-            VIP ({metrics.vipCount})
-          </button>
+          
         </div>
 
         {/* Quick Search */}
@@ -867,38 +847,7 @@ function TablesPage() {
                 </div>
               )}
 
-              {/* VIP Toggle (Compact) */}
-              <div className="flex items-center justify-between rounded-xl border border-purple-200 bg-purple-50/40 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <Crown size={14} className="text-purple-600" />
-                  <div>
-                    <span className="text-xs font-bold text-purple-950 block leading-tight">
-                      Mark as VIP / Private Booth
-                    </span>
-                    <span className="text-[10px] text-purple-700 block">
-                      Prioritized with VIP badge on POS terminals
-                    </span>
-                  </div>
-                </div>
-
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isVip}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormData((prev) => ({
-                        ...prev,
-                        isVip: checked,
-                        capacity: checked ? Math.max(6, prev.capacity) : prev.capacity,
-                        location: checked ? `${prev.location} (VIP)` : prev.location.replace(" (VIP)", ""),
-                      }));
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
-                </label>
-              </div>
+              
 
               {/* Step 2: Inputs Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

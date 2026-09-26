@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import api from "../../../services/api";
 import SmoothMonthlyRevenueChart from "../components/SmoothMonthlyRevenueChart";
+import DashboardBarChart from "../components/DashboardBarChart";
 
 export default function DashboardPage() {
   const [dashboard, setDashboard] = useState(null);
@@ -783,89 +784,19 @@ export default function DashboardPage() {
         </div>
 
         {/* ====================================================
-            QUICK ACTIONS
+            BAR CHART ANALYTICS (REPLACED QUICK OPERATIONS)
         ==================================================== */}
 
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 p-5">
-            <h2 className="font-bold text-gray-900">
-              Quick Operations
-            </h2>
-
-            <p className="text-xs text-gray-500">
-              Direct access to restaurant & bar management
-            </p>
-          </div>
-
-          <div className="space-y-3 p-5">
-            {/* New Order */}
-
-            <Link
-              to="/pos"
-              className="flex w-full items-center justify-between rounded-xl border border-gray-200 p-3.5 text-left transition hover:border-blue-300 hover:bg-blue-50/50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                  <ShoppingCart className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">
-                    POS & New Order
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Take customer orders
-                  </p>
-                </div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-gray-400" />
-            </Link>
-
-            {/* Tables */}
-
-            <Link
-              to="/tables"
-              className="flex w-full items-center justify-between rounded-xl border border-gray-200 p-3.5 text-left transition hover:border-emerald-300 hover:bg-emerald-50/50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                  <Utensils className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">
-                    Table Management
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    View active tables
-                  </p>
-                </div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-gray-400" />
-            </Link>
-
-
-
-            {/* Bar */}
-
-            <Link
-              to="/bar"
-              className="flex w-full items-center justify-between rounded-xl border border-gray-200 p-3.5 text-left transition hover:border-pink-300 hover:bg-pink-50/50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-pink-100 text-pink-600">
-                  <Wine className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">
-                    Bar Operations
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Monitor drink prep
-                  </p>
-                </div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-gray-400" />
-            </Link>
-          </div>
+        <div className="lg:col-span-1">
+          <DashboardBarChart
+            dashboardStats={dashboard}
+            orders={orders}
+            expenses={expenses}
+            reservations={reservations}
+            metrics={metrics}
+            formatMoney={formatMoney}
+            externalTimeframe={timeframe}
+          />
         </div>
       </div>
 
