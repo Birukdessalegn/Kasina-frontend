@@ -325,7 +325,9 @@ function EmployeesPage() {
       if (posRes?.positions) {
           const cleaned = posRes.positions.map((p) => ({
             ...p,
-            title: p.title?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist") || p.title,
+            title: p.title
+              ?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist")
+              ?.replace(/line chef/i, "Restaurant Chef") || p.title,
           }));
           setPositionsList(cleaned);
         }
@@ -1098,7 +1100,10 @@ function EmployeesPage() {
                       .slice(0, 2)
                       .toUpperCase();
 
-                    const positionTitle = employee.position_title || employee.positionTitle;
+                    const rawPosTitle = employee.position_title || employee.positionTitle;
+                    const positionTitle = rawPosTitle
+                      ?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist")
+                      ?.replace(/line chef/i, "Restaurant Chef");
                     const outletName = employee.outlet_name || employee.outletName;
                     const reportsToName = employee.reports_to_name || employee.reportsToName;
 
@@ -1667,7 +1672,9 @@ function EmployeesPage() {
                     >
                       <option value="">Select official position (optional)</option>
                       {positionsList.map((pos) => {
-                        const displayTitle = pos.title?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist") || pos.title;
+                        const displayTitle = pos.title
+                          ?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist")
+                          ?.replace(/line chef/i, "Restaurant Chef") || pos.title;
                         return (
                           <option key={pos.id} value={pos.id}>
                             {displayTitle} {pos.department_name ? `(${pos.department_name})` : ""}
@@ -2004,7 +2011,11 @@ function EmployeesPage() {
                   <InfoBox
                     icon={Briefcase}
                     label="Position / Title"
-                    value={selectedEmployee.position_title || selectedEmployee.role || "-"}
+                    value={
+                      (selectedEmployee.position_title || selectedEmployee.role || "-")
+                        ?.replace(/line chef/i, "Restaurant Chef")
+                        ?.replace(/receptionist\s*\/\s*cashier/i, "Receptionist")
+                    }
                   />
                   <InfoBox
                     icon={Store}
