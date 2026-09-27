@@ -25,6 +25,7 @@ import {
   GitFork,
   Crown,
   Sparkles,
+  AlertCircle,
 } from "lucide-react";
 
 import { useEffect, useMemo, useState } from "react";
@@ -262,8 +263,32 @@ function EmployeesPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showRejectBox, setShowRejectBox] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Check if typed username is already taken by another employee
+  const isUsernameTaken = useMemo(() => {
+    if (!form.username || !form.username.trim()) return false;
+    const cleanTyped = form.username.trim().toLowerCase();
+
+    return employeeList.some((emp) => {
+      if (
+        editingEmployee &&
+        (emp.id === editingEmployee.id ||
+          (emp.user_id && editingEmployee.user_id && emp.user_id === editingEmployee.user_id))
+      ) {
+        return false;
+      }
+      const existing = (
+        emp.username ||
+        emp.user_username ||
+        emp.user_name ||
+        (emp.user && emp.user.username) ||
+        ""
+      ).trim().toLowerCase();
+
+      return existing && existing === cleanTyped;
+    });
+  }, [form.username, employeeList, editingEmployee]);
 
   const [toast, setToast] = useState({
     show: false,
@@ -521,6 +546,11 @@ function EmployeesPage() {
         return;
       }
 
+      if (isUsernameTaken) {
+        setError(`The username "${form.username.trim()}" is already in use by another staff member. Please choose a different username.`);
+        return;
+      }
+
       if (!editingEmployee && !form.password.trim()) {
         setError("Password is required.");
         return;
@@ -614,14 +644,15 @@ function EmployeesPage() {
       const errorMessage = error.message || "Failed to save employee";
 
       if (errorMessage.toLowerCase().includes("username already exists")) {
+        setError(`The username "${form.username.trim()}" is already in use by another staff member. Please choose a different username.`);
         showToast("error", "Username already registered.");
       } else if (errorMessage.toLowerCase().includes("email already exists")) {
+        setError(`The email "${form.email.trim()}" is already registered. Please choose a different email.`);
         showToast("error", "Email already registered.");
       } else {
+        setError(errorMessage);
         showToast("error", errorMessage);
       }
-
-      setError("");
     } finally {
       setSaving(false);
     }
@@ -1336,6 +1367,24 @@ function EmployeesPage() {
               onSubmit={handleSaveEmployee}
               className="flex-1 space-y-6 overflow-y-auto p-6"
             >
+              {/* TOP ERROR BANNER */}
+              {error && (
+                <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 shadow-sm animate-in fade-in">
+                  <XCircle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+                  <div className="flex-1 text-sm font-medium">
+                    <p className="font-bold text-red-900">Registration Notice</p>
+                    <p className="mt-0.5 text-red-800">{error}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setError("")}
+                    className="rounded-lg p-1 text-red-400 hover:bg-red-100 hover:text-red-700 transition"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
               {/* PERSONAL INFORMATION */}
               <div>
                 <div className="mb-4 flex items-center gap-2">
@@ -1447,14 +1496,45 @@ function EmployeesPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormInput
-                    label="Username"
-                    name="username"
-                    value={form.username}
-                    onChange={handleFormChange}
-                    placeholder="e.g. brook"
-                    required={!editingEmployee}
-                  />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Username{" "}
+                      {!editingEmployee && (
+                        <span className="text-red-500">*</span>
+                      )}
+                    </label>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="username"
+                        value={form.username}
+                        onChange={(e) => {
+                          handleFormChange(e);
+                          if (error) setError("");
+                        }}
+                        placeholder="e.g. brook"
+                        required={!editingEmployee}
+                        className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition ${
+                          isUsernameTaken
+                            ? "border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                            : "border-gray-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                        }`}
+                      />
+                      {isUsernameTaken && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-red-600 pointer-events-none">
+                          <XCircle size={17} />
+                        </div>
+                      )}
+                    </div>
+
+                    {isUsernameTaken && (
+                      <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
+                        <AlertCircle size={14} className="shrink-0 text-red-600" />
+                        <span>This username is already used. Please choose a different username.</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">
