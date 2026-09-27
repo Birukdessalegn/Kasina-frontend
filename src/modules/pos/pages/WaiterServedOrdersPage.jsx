@@ -15,9 +15,11 @@ import {
   Table as TableIcon,
   ChevronDown,
   ChevronUp,
+  Eye,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../services/api";
+import PaymentProofModal from "../components/PaymentProofModal";
 
 function WaiterServedOrdersPage() {
   const { user } = useAuth();
@@ -31,6 +33,7 @@ function WaiterServedOrdersPage() {
   const [shiftFilter, setShiftFilter] = useState("all"); // "all" | "day" | "night"
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
+  const [selectedProofOrder, setSelectedProofOrder] = useState(null);
 
   const userIdStr = String(user?.id || user?.user_id || user?.userId || "");
   const employeeIdStr = String(user?.employee_id || user?.employeeId || "");
@@ -141,6 +144,9 @@ function WaiterServedOrdersPage() {
         const pm = item.payment_method || item.paymentMethod || existing.payment_method || existing.paymentMethod || "";
         const ref = item.reference || item.payment_reference || item.notes || existing.reference || existing.payment_reference || "";
         const custId = item.customer_id || item.vip_customer_id || item.vipCustomerId || existing.customer_id || existing.vip_customer_id || null;
+        const receiptImg = item.receipt_image || item.image_url || item.receipt_url || existing.receipt_image || existing.image_url || existing.receipt_url || null;
+        const proofImg = item.proof_image || item.proof_url || existing.proof_image || existing.proof_url || null;
+        const paymentsList = (Array.isArray(item.payments) && item.payments.length > 0) ? item.payments : (existing.payments || []);
 
         orderMap.set(key, {
           ...existing,
@@ -154,6 +160,9 @@ function WaiterServedOrdersPage() {
           payment_method: pm,
           reference: ref,
           customer_id: custId,
+          receipt_image: receiptImg,
+          proof_image: proofImg,
+          payments: paymentsList,
           waiter_first_name: item.waiter_first_name || existing.waiter_first_name || "",
           waiter_last_name: item.waiter_last_name || existing.waiter_last_name || "",
           waiter_id: item.waiter_id || existing.waiter_id,
@@ -433,6 +442,44 @@ function WaiterServedOrdersPage() {
     return { label: "⏳ Pending", class: "bg-amber-100 text-amber-900 border border-amber-200 font-bold" };
   };
 
+  const hasPaymentProof = (order) => {
+    if (!order) return false;
+    if (
+      order.receipt_image ||
+      order.receiptImage ||
+      order.receipt_url ||
+      order.receiptUrl ||
+      order.proof_image ||
+      order.proofImage ||
+      order.proof_url ||
+      order.proofUrl ||
+      order.image_url ||
+      order.imageUrl ||
+      order.image ||
+      order.payment_proof ||
+      order.has_receipt
+    ) {
+      return true;
+    }
+    if (Array.isArray(order.payments) && order.payments.length > 0) {
+      return order.payments.some(
+        (p) =>
+          p.receipt_image ||
+          p.receiptImage ||
+          p.receipt_url ||
+          p.receiptUrl ||
+          p.proof_image ||
+          p.proofImage ||
+          p.proof_url ||
+          p.proofUrl ||
+          p.image_url ||
+          p.imageUrl ||
+          p.image
+      );
+    }
+    return false;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50/50 p-4 md:p-6 lg:p-8">
       {/* =========================================================
@@ -710,7 +757,7 @@ function WaiterServedOrdersPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${getStatusBadgeClass(order.status)}`}>
                           {order.status === "served" ? <CheckCircle2 className="h-3 w-3" /> : null}
                           {String(order.status || "served").toUpperCase()}
@@ -718,6 +765,22 @@ function WaiterServedOrdersPage() {
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${getPaymentBadgeClass(order.payment_status, order.status)}`}>
                           {formatPaymentStatusLabel(order.payment_status, order.status)}
                         </span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${pmObj.class}`}>
+                          {pmObj.label}
+                        </span>
+                        {hasPaymentProof(order) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedProofOrder(order);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 text-[10px] font-extrabold shadow-2xs transition active:scale-95 cursor-pointer"
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span>View Proof</span>
+                          </button>
+                        )}
                       </div>
 
                       <button
@@ -864,9 +927,25 @@ function WaiterServedOrdersPage() {
 
                           {/* Payment Method Column */}
                           <td className="px-5 py-4">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${pmObj.class}`}>
-                              {pmObj.label}
-                            </span>
+                            <div className="flex flex-col items-start gap-1.5">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${pmObj.class}`}>
+                                {pmObj.label}
+                              </span>
+                              {hasPaymentProof(order) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedProofOrder(order);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 text-[10px] font-extrabold shadow-2xs transition active:scale-95 cursor-pointer"
+                                  title="View Payment Proof"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                  <span>View Proof</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
 
                           {/* Amount */}
@@ -980,9 +1059,21 @@ function WaiterServedOrdersPage() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
                   <span className="text-[10px] font-bold uppercase text-slate-400 block">Payment Method</span>
-                  <span className={`inline-flex items-center gap-1 mt-1 rounded-full px-2.5 py-0.5 font-bold ${formatPaymentMethodObj(selectedOrderDetail).class}`}>
-                    {formatPaymentMethodObj(selectedOrderDetail).label}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-bold ${formatPaymentMethodObj(selectedOrderDetail).class}`}>
+                      {formatPaymentMethodObj(selectedOrderDetail).label}
+                    </span>
+                    {hasPaymentProof(selectedOrderDetail) && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProofOrder(selectedOrderDetail)}
+                        className="inline-flex items-center gap-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-2.5 py-0.5 text-[11px] font-extrabold shadow-2xs transition cursor-pointer"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>View Proof</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
                   <span className="text-[10px] font-bold uppercase text-slate-400 block">Payment Status</span>
@@ -1056,6 +1147,16 @@ function WaiterServedOrdersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* =========================================================
+          PAYMENT PROOF MODAL
+      ========================================================= */}
+      {selectedProofOrder && (
+        <PaymentProofModal
+          order={selectedProofOrder}
+          onClose={() => setSelectedProofOrder(null)}
+        />
       )}
     </div>
   );
