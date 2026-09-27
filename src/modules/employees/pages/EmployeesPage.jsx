@@ -58,6 +58,8 @@ const roles = [
   { id: 19, name: "bartender", label: "Bartender" },
   { id: 20, name: "fb_controller", label: "F&B Controller / Kitchen Auditor" },
   { id: 21, name: "receptionist", label: "Receptionist / Front Desk" },
+  { id: 22, name: "janitor", label: "Janitor / Cleaner" },
+  { id: 23, name: "security_guard", label: "Security Guard" },
 ];
 
 const departments = [
@@ -219,11 +221,6 @@ function parseShiftStringToTimes(shiftStr) {
 
 function getEmployeeUsername(employee) {
   if (!employee) return "-";
-  const emailVal = employee.email || employee.user_email || employee.userEmail || "";
-  const firstVal = employee.first_name || employee.firstName || "";
-  const lastVal = employee.last_name || employee.lastName || "";
-  const fallbackFromEmail = emailVal ? emailVal.split("@")[0] : null;
-  const fallbackFromName = firstVal ? `${firstVal}${lastVal}`.toLowerCase().replace(/\s+/g, "") : null;
 
   const un =
     employee.username ||
@@ -234,11 +231,18 @@ function getEmployeeUsername(employee) {
     employee.user?.user_name ||
     employee.User?.username ||
     employee.User?.user_name ||
-    employee.account_username ||
-    fallbackFromEmail ||
-    fallbackFromName;
+    employee.account_username;
 
-  return un && String(un).trim() !== "" ? String(un).trim() : "-";
+  if (un && String(un).trim() !== "") return String(un).trim();
+  if (!employee.user_id && !employee.userId) return "No Login Account";
+
+  const emailVal = employee.email || employee.user_email || employee.userEmail || "";
+  const firstVal = employee.first_name || employee.firstName || "";
+  const lastVal = employee.last_name || employee.lastName || "";
+  const fallbackFromEmail = emailVal ? emailVal.split("@")[0] : null;
+  const fallbackFromName = firstVal ? `${firstVal}${lastVal}`.toLowerCase().replace(/\s+/g, "") : null;
+
+  return fallbackFromEmail || fallbackFromName || "-";
 }
 
 // =====================================================
@@ -290,6 +294,32 @@ function EmployeesPage() {
       return existing && existing === cleanTyped;
     });
   }, [form.username, employeeList, editingEmployee]);
+
+  // Check if selected position or role is a non-login actor (Janitor, Security Guard, etc.)
+  const isNonLoginRole = useMemo(() => {
+    const currentRoles = rolesList.length > 0 ? rolesList : roles;
+    const selectedRole = currentRoles.find(
+      (r) =>
+        String(r.id) === String(form.roleId) ||
+        String(r.name).toLowerCase() === String(form.roleId).toLowerCase()
+    );
+    const roleName = (selectedRole?.name || "").toLowerCase();
+
+    const selectedPos = positionsList.find((p) => String(p.id) === String(form.positionId));
+    const posTitle = (selectedPos?.title || "").toLowerCase();
+    const posCode = (selectedPos?.code || "").toLowerCase();
+
+    return (
+      roleName === "janitor" ||
+      roleName === "security_guard" ||
+      roleName.includes("security") ||
+      posTitle.includes("janitor") ||
+      posTitle.includes("cleaner") ||
+      posTitle.includes("security") ||
+      posCode.includes("janitor") ||
+      posCode.includes("security")
+    );
+  }, [form.roleId, form.positionId, rolesList, positionsList]);
 
   const [toast, setToast] = useState({
     show: false,
@@ -510,6 +540,16 @@ function EmployeesPage() {
                 (o.name || "").toLowerCase().includes("bar & restaurant")
             );
             if (barRestOutlet) updated.outletId = String(barRestOutlet.id);
+          } else if (pTitle.includes("janitor") || pCode.includes("janitor")) {
+            const janitorRole = (rolesList.length > 0 ? rolesList : roles).find((r) => r.name === "janitor");
+            if (janitorRole) updated.roleId = String(janitorRole.id);
+            const hkDept = (departmentsList.length > 0 ? departmentsList : departments).find((d) => d.name?.toLowerCase() === "housekeeping");
+            if (hkDept) updated.departmentId = String(hkDept.id);
+          } else if (pTitle.includes("security") || pCode.includes("security")) {
+            const secRole = (rolesList.length > 0 ? rolesList : roles).find((r) => r.name === "security_guard");
+            if (secRole) updated.roleId = String(secRole.id);
+            const adminDept = (departmentsList.length > 0 ? departmentsList : departments).find((d) => d.name?.toLowerCase().includes("admin") || d.name?.toLowerCase().includes("management"));
+            if (adminDept) updated.departmentId = String(adminDept.id);
           }
         }
       }
@@ -550,20 +590,22 @@ function EmployeesPage() {
         return;
       }
 
-      if (!editingEmployee && !form.username.trim()) {
-        setError("Username is required.");
-        return;
-      }
+      if (!isNonLoginRole) {
+        if (!editingEmployee && !form.username.trim()) {
+          setError("Username is required.");
+          return;
+        }
 
-      if (isUsernameTaken) {
-        setUsernameConflictPopup(form.username.trim());
-        setError(`The username "${form.username.trim()}" is already in use by another staff member. Please choose a different username.`);
-        return;
-      }
+        if (isUsernameTaken) {
+          setUsernameConflictPopup(form.username.trim());
+          setError(`The username "${form.username.trim()}" is already in use by another staff member. Please choose a different username.`);
+          return;
+        }
 
-      if (!editingEmployee && !form.password.trim()) {
-        setError("Password is required.");
-        return;
+        if (!editingEmployee && !form.password.trim()) {
+          setError("Password is required.");
+          return;
+        }
       }
 
       const currentRoles = rolesList.length > 0 ? rolesList : roles;
@@ -582,10 +624,10 @@ function EmployeesPage() {
         lastName: form.lastName.trim(),
         last_name: form.lastName.trim(),
 
-        username: form.username.trim() || null,
+        username: isNonLoginRole ? null : (form.username.trim() || null),
 
-        // Only send password if user provided a new one
-        ...(form.password && form.password.trim() ? { password: form.password.trim() } : {}),
+        // Only send password if user provided a new one and not a non-login role
+        ...(!isNonLoginRole && form.password && form.password.trim() ? { password: form.password.trim() } : {}),
 
         email: form.email.trim() || null,
         phone: form.phone.trim() || null,
@@ -1128,7 +1170,13 @@ function EmployeesPage() {
                                   employee.employeeCode ||
                                   employee.code ||
                                   `EMP-${String(employee.id).padStart(3, "0")}`}
-                                {employee.username && ` • @${employee.username}`}
+                                {employee.username ? (
+                                  ` • @${employee.username}`
+                                ) : (
+                                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                    No Login
+                                  </span>
+                                )}
                               </p>
                             </div>
                           </div>
@@ -1544,102 +1592,118 @@ function EmployeesPage() {
               </div>
 
               {/* LOGIN CREDENTIALS */}
-              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <KeyRound
-                    size={18}
-                    className="text-blue-600"
-                  />
+              {isNonLoginRole ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4.5 flex items-start gap-3.5 shadow-2xs">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 shrink-0 font-bold">
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">
-                      Login Credentials
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      These credentials will be stored in the users table.
+                    <h4 className="text-sm font-bold text-emerald-950">
+                      No System Login Required
+                    </h4>
+                    <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                      Staff in this position (such as <strong>Janitor</strong> or <strong>Security Guard</strong>) are registered strictly for HR records, shift scheduling, daily attendance, and payroll. No login account or password will be created.
                     </p>
                   </div>
                 </div>
+              ) : (
+                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-5">
+                  <div className="mb-4 flex items-center gap-2">
+                    <KeyRound
+                      size={18}
+                      className="text-blue-600"
+                    />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        Login Credentials
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        These credentials will be stored in the users table.
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Username{" "}
-                      {!editingEmployee && (
-                        <span className="text-red-500">*</span>
-                      )}
-                    </label>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Username{" "}
+                        {!editingEmployee && (
+                          <span className="text-red-500">*</span>
+                        )}
+                      </label>
 
-                    <div className="relative">
-                      <input
-                        type="text"
-                        name="username"
-                        value={form.username}
-                        onChange={(e) => {
-                          handleFormChange(e);
-                          if (error) setError("");
-                        }}
-                        placeholder="e.g. brook"
-                        required={!editingEmployee}
-                        className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition ${
-                          isUsernameTaken
-                            ? "border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-                            : "border-gray-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                        }`}
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          name="username"
+                          value={form.username}
+                          onChange={(e) => {
+                            handleFormChange(e);
+                            if (error) setError("");
+                          }}
+                          placeholder="e.g. brook"
+                          required={!editingEmployee}
+                          className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition ${
+                            isUsernameTaken
+                              ? "border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                              : "border-gray-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                          }`}
+                        />
+                        {isUsernameTaken && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-red-600 pointer-events-none">
+                            <XCircle size={17} />
+                          </div>
+                        )}
+                      </div>
+
                       {isUsernameTaken && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-red-600 pointer-events-none">
-                          <XCircle size={17} />
+                        <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
+                          <AlertCircle size={14} className="shrink-0 text-red-600" />
+                          <span>This username is already used. Please choose a different username.</span>
                         </div>
                       )}
                     </div>
 
-                    {isUsernameTaken && (
-                      <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700">
-                        <AlertCircle size={14} className="shrink-0 text-red-600" />
-                        <span>This username is already used. Please choose a different username.</span>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Password{" "}
+                        {!editingEmployee && (
+                          <span className="text-red-500">*</span>
+                        )}
+                      </label>
+
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          value={form.password}
+                          onChange={handleFormChange}
+                          placeholder={
+                            editingEmployee
+                              ? "Leave blank to keep current password"
+                              : "Enter password"
+                          }
+                          className="w-full rounded-lg border border-gray-200 pl-3 pr-10 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                          title={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                       </div>
-                    )}
-                  </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Password{" "}
-                      {!editingEmployee && (
-                        <span className="text-red-500">*</span>
+                      {editingEmployee && (
+                        <p className="mt-1 text-xs text-gray-400">
+                          Only enter a password if you want to change it.
+                        </p>
                       )}
-                    </label>
-
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={form.password}
-                        onChange={handleFormChange}
-                        placeholder={
-                          editingEmployee
-                            ? "Leave blank to keep current password"
-                            : "Enter password"
-                        }
-                        className="w-full rounded-lg border border-gray-200 pl-3 pr-10 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                        title={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
                     </div>
-
-                    {editingEmployee && (
-                      <p className="mt-1 text-xs text-gray-400">
-                        Only enter a password if you want to change it.
-                      </p>
-                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* JOB INFORMATION */}
               <div>
