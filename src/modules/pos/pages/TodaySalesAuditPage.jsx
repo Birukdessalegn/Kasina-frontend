@@ -326,6 +326,7 @@ function TodaySalesAuditPage() {
   const creditOrders = orders.filter((o) => o.payment_status === "credit_pending");
 
   const totalRevenue = paidOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
+  const totalPaidRevenue = totalRevenue;
   const pendingCreditTotal = creditOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
 
   /* Breakdown by payment method */
@@ -996,11 +997,11 @@ function TodaySalesAuditPage() {
                 {filteredOrders.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-100 font-black text-slate-900">
-                      <td colSpan="3" className="px-3 py-3.5 text-right text-xs uppercase tracking-wider">
+                      <td colSpan="2" className="px-3 py-3.5 text-right text-xs uppercase tracking-wider">
                         Grand Total Verified Sales Revenue:
                       </td>
-                      <td className="px-3 py-3.5 font-black text-sm text-emerald-800">
-                        {totalPaidRevenue.toLocaleString()} ETB
+                      <td className="px-3 py-3.5 font-black text-sm text-emerald-800 whitespace-nowrap">
+                        {(totalPaidRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB
                       </td>
                       <td colSpan="2"></td>
                     </tr>

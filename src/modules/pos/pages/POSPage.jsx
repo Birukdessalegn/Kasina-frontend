@@ -69,6 +69,10 @@ function POSPage() {
     user?.role_id === 2;
 
   const userPosition = (user?.position_title || user?.position || "").toLowerCase();
+  const isWaiter =
+    userRoleUpper === "WAITER" ||
+    userRoleUpper === "CAFE_WAITER" ||
+    userPosition.includes("waiter");
   const isCafeCashier = userRoleUpper.includes("CAFE") || userPosition.includes("cafe") || effectiveOutletCode === "CAFE";
   const isBarRestCashier = userPosition.includes("bar") || userPosition.includes("restaurant") || effectiveOutletCode === "BAR_RESTAURANT" || effectiveOutletCode === "RESTAURANT";
   const canSwitchVenue = isManagerOrAdmin;
@@ -438,13 +442,15 @@ function POSPage() {
         </div>
       </div>
 
-      {/* Cashier Shift Status Banner */}
-      <CashierShiftBanner
-        currentShift={currentShift}
-        loadingShift={loadingShift}
-        onStartShiftClick={() => setIsStartShiftModalOpen(true)}
-        onCloseShiftClick={() => setIsCloseShiftModalOpen(true)}
-      />
+      {/* Cashier Shift Status Banner (Hidden for Waiters) */}
+      {!isWaiter && (
+        <CashierShiftBanner
+          currentShift={currentShift}
+          loadingShift={loadingShift}
+          onStartShiftClick={() => setIsStartShiftModalOpen(true)}
+          onCloseShiftClick={() => setIsCloseShiftModalOpen(true)}
+        />
+      )}
 
       <ActiveOrders />
 

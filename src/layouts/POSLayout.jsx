@@ -19,7 +19,7 @@ import { useState, useRef, useEffect } from "react";
 
 const menuItems = [
   {
-    name: "POS Terminal",
+    name: "Menu Page",
     path: "/pos",
     icon: ShoppingCart,
   },
@@ -52,6 +52,20 @@ function POSLayout() {
   const notificationRef = useRef(null);
 
   const isReportsPage = location.pathname === "/pos/reports";
+
+  const userRoleUpper = (user?.role || "").toUpperCase();
+  const userPosition = (user?.position_title || user?.position || "").toLowerCase();
+  const isWaiter =
+    userRoleUpper === "WAITER" ||
+    userRoleUpper === "CAFE_WAITER" ||
+    userPosition.includes("waiter");
+
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (isWaiter) {
+      return item.path === "/pos" || item.path === "/pos/served-orders";
+    }
+    return true;
+  });
 
   /* =====================================================
      CLOSE DROPDOWNS WHEN CLICKING OUTSIDE
@@ -144,7 +158,7 @@ function POSLayout() {
             Operations
           </p>
 
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
 
             return (
