@@ -264,6 +264,7 @@ function EmployeesPage() {
   const [deleting, setDeleting] = useState(false);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [usernameConflictPopup, setUsernameConflictPopup] = useState(null);
 
   // Check if typed username is already taken by another employee
   const isUsernameTaken = useMemo(() => {
@@ -547,6 +548,7 @@ function EmployeesPage() {
       }
 
       if (isUsernameTaken) {
+        setUsernameConflictPopup(form.username.trim());
         setError(`The username "${form.username.trim()}" is already in use by another staff member. Please choose a different username.`);
         return;
       }
@@ -644,6 +646,7 @@ function EmployeesPage() {
       const errorMessage = error.message || "Failed to save employee";
 
       if (errorMessage.toLowerCase().includes("username already exists")) {
+        setUsernameConflictPopup(form.username.trim());
         setError(`The username "${form.username.trim()}" is already in use by another staff member. Please choose a different username.`);
         showToast("error", "Username already registered.");
       } else if (errorMessage.toLowerCase().includes("email already exists")) {
@@ -1328,6 +1331,54 @@ function EmployeesPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* =================================================
+          DUPLICATE USERNAME POP-UP MODAL
+      ================================================= */}
+      {usernameConflictPopup && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-2xl border border-red-100 animate-in zoom-in-95">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600 shadow-inner">
+              <AlertCircle size={32} />
+            </div>
+
+            <div className="mt-4 text-center">
+              <h3 className="text-lg font-bold text-gray-900">
+                Username Already In Use!
+              </h3>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                The username{" "}
+                <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                  {usernameConflictPopup}
+                </span>{" "}
+                is already assigned to another staff member.
+              </p>
+              <p className="mt-2 text-xs text-gray-500">
+                Every employee must have a unique login username. Please enter a different username to proceed.
+              </p>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setUsernameConflictPopup(null);
+                  setTimeout(() => {
+                    const usernameInput = document.querySelector('input[name="username"]');
+                    if (usernameInput) {
+                      usernameInput.focus();
+                      usernameInput.select();
+                    }
+                  }, 100);
+                }}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/25 hover:bg-red-700 transition active:scale-[0.99] cursor-pointer"
+              >
+                Change Username
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* =================================================
