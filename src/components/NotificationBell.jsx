@@ -43,31 +43,14 @@ function NotificationBell() {
   };
 
   return (
-    <div className="relative">
-
-      {/* Bell */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100"
-      >
-        <Bell size={20} />
-
-        {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {/* Notification panel */}
-      {open && (
-        <div
-          onTouchStart={handlePanelTouchStart}
-          onTouchEnd={handlePanelTouchEnd}
+    <div
           className="fixed inset-x-2 top-14 sm:absolute sm:inset-auto sm:right-0 sm:top-auto sm:mt-2 w-auto sm:w-80 max-w-sm mx-auto sm:mx-0 z-50 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl animate-fade-in"
         >
           {/* Mobile Drag / Swipe Handle */}
-          <div className="sm:hidden pt-2.5 pb-1 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing bg-gray-50 border-b border-gray-100">
+          <div
+            onTouchStart={handlePanelTouchStart}
+            onTouchEnd={handlePanelTouchEnd}
+            className="sm:hidden pt-2.5 pb-1 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing bg-gray-50 border-b border-gray-100">
             <div className="w-10 h-1 rounded-full bg-gray-300" />
             <span className="text-[9px] text-gray-400 mt-0.5 font-medium tracking-tight">Swipe up or down to close</span>
           </div>
