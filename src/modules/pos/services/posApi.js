@@ -22,11 +22,16 @@ export const startShift = async (openingCash = 0, outletId = null) => {
 };
 
 export const closeShift = async (actualCashCounted = 0, notes = '') => {
+  const parsedCash = Number(actualCashCounted);
+  const counted = isNaN(parsedCash) ? 0 : parsedCash;
   return await api('/pos/shifts/close', {
     method: 'POST',
     body: JSON.stringify({
-      actual_cash_counted: Number(actualCashCounted) || 0,
-      actualCashCounted: Number(actualCashCounted) || 0,
+      actual_cash: counted,
+      actualCash: counted,
+      actual_cash_counted: counted,
+      actualCashCounted: counted,
+      closing_notes: notes,
       notes,
     }),
   });
