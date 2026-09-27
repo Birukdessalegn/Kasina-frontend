@@ -64,10 +64,10 @@ function CashierShiftBanner({ currentShift, loadingShift, onStartShiftClick, onC
       <button
         type="button"
         onClick={onCloseShiftClick}
-        className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-800 shadow-xs hover:bg-amber-50 active:scale-[0.99] transition w-full sm:w-auto shrink-0"
+        className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 shadow-xs hover:bg-rose-100 active:scale-[0.99] transition w-full sm:w-auto shrink-0 cursor-pointer"
       >
-        <Clock className="h-4 w-4 text-amber-600" />
-        End Shift & Handover
+        <Clock className="h-4 w-4 text-rose-600" />
+        Close Shift
       </button>
     </div>
   );

@@ -5,7 +5,8 @@ import api from '../../../services/api';
 // =========================================================
 
 export const getCurrentShift = async () => {
-  return await api('/pos/shifts/current');
+  const res = await api('/pos/shifts/current');
+  return res?.shift || res?.data || res;
 };
 
 export const startShift = async (openingCash = 0, outletId = null) => {

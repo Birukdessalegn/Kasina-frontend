@@ -81,7 +81,8 @@ function POSPage() {
     try {
       setLoadingShift(true);
       const res = await getCurrentShift();
-      setCurrentShift(res.data || null);
+      const shiftData = res?.shift || res?.data || (res?.id ? res : null);
+      setCurrentShift(shiftData);
     } catch (err) {
       console.warn("Current cashier shift fetch:", err);
       setCurrentShift(null);
