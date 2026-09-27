@@ -62,13 +62,16 @@ function POSPage() {
     effectiveOutletCode === "RESTAURANT" ||
     effectiveOutletId === 4;
 
-  const isCashier = userRoleUpper.includes("CASHIER") || user?.role_id === 5;
+  const userPosition = (user?.position_title || user?.position || "").toLowerCase();
+  const isCashier =
+    userRoleUpper.includes("CASHIER") ||
+    user?.role_id === 5 ||
+    userPosition.includes("cashier");
   const isManagerOrAdmin =
     ["ADMIN", "HOTEL_MANAGER", "COOPERATIVE_MANAGER", "MANAGER", "FNB_MANAGER"].includes(userRoleUpper) ||
     user?.role_id === 1 ||
     user?.role_id === 2;
 
-  const userPosition = (user?.position_title || user?.position || "").toLowerCase();
   const isWaiter =
     userRoleUpper === "WAITER" ||
     userRoleUpper === "CAFE_WAITER" ||
@@ -442,8 +445,8 @@ function POSPage() {
         </div>
       </div>
 
-      {/* Cashier Shift Status Banner (Hidden for Waiters) */}
-      {!isWaiter && (
+      {/* Cashier Shift Status Banner (Only for Cashiers) */}
+      {isCashier && (
         <CashierShiftBanner
           currentShift={currentShift}
           loadingShift={loadingShift}
