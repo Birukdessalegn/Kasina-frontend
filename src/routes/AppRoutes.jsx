@@ -25,6 +25,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import KitchenLayout from "../layouts/KitchenLayout";
 import POSLayout from "../layouts/POSLayout";
 import BarLayout from "../layouts/BarLayout";
+import BaristaLayout from "../layouts/BaristaLayout";
 import InventoryLayout from "../layouts/InventoryLayout";
 import FinanceLayout from "../layouts/FinanceLayout";
 
@@ -46,6 +47,7 @@ import PurchasingReportsPage from "../modules/purchasing/pages/PurchasingReports
 import TodaySalesAuditPage from "../modules/pos/pages/TodaySalesAuditPage";
 
 import BarPage from "../modules/bar/pages/BarPage";
+import BaristaPage from "../modules/barista/pages/BaristaPage";
 
 import InventoryPage from "../modules/inventory/pages/InventoryPage";
 import InventoryLowStockPage from "../modules/inventory/pages/InventoryLowStockPage";
@@ -320,6 +322,32 @@ function AppRoutes() {
                 <Route
                     path="/bar/reports"
                     element={<BarReportsPage />}
+                />
+            </Route>
+
+            {/* -------------------------
+                BARISTA (COFFEE STATION)
+            -------------------------- */}
+            <Route
+                element={
+                    <PermissionRoute permission="barista" />
+                }
+            >
+                <Route
+                    path="/operations/barista"
+                    element={<BaristaPage />}
+                />
+                <Route
+                    path="/operations/barista/new"
+                    element={<BaristaPage />}
+                />
+                <Route
+                    path="/operations/barista/preparing"
+                    element={<BaristaPage />}
+                />
+                <Route
+                    path="/operations/barista/ready"
+                    element={<BaristaPage />}
                 />
             </Route>
 
@@ -611,6 +639,41 @@ function AppRoutes() {
               <Route
                 path="/bartender/bar/reports"
                 element={<BarReportsPage />}
+              />
+
+            </Route>
+          </Route>
+
+
+          {/* =================================================
+              BARISTA ONLY (STANDALONE STATION)
+          ================================================= */}
+
+          <Route
+            element={
+              <PermissionRoute permission="barista" />
+            }
+          >
+            <Route element={<BaristaLayout />}>
+
+              <Route
+                path="/barista"
+                element={<BaristaPage />}
+              />
+
+              <Route
+                path="/barista/new"
+                element={<BaristaPage />}
+              />
+
+              <Route
+                path="/barista/preparing"
+                element={<BaristaPage />}
+              />
+
+              <Route
+                path="/barista/ready"
+                element={<BaristaPage />}
               />
 
             </Route>

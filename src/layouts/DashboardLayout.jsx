@@ -227,6 +227,11 @@ const navigationGroups = [
             icon: ShoppingCart,
           },
           {
+            name: "Barista Station",
+            path: "/operations/barista",
+            icon: Coffee,
+          },
+          {
             name: "Bar Reports",
             path: "/bar/reports",
             icon: BarChart3,
