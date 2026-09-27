@@ -1138,6 +1138,36 @@ function ActiveOrders() {
         />
       )}
 
+      {/* ============================================================
+          EDIT / ADD ITEMS MODAL
+      ============================================================ */}
+
+      {selectedEditOrder && (
+        <EditOrderModal
+          isOpen={true}
+          order={selectedEditOrder}
+          onClose={async () => {
+            setSelectedEditOrder(null);
+            await fetchPosOrders();
+            if (fetchKitchenOrders) await fetchKitchenOrders();
+            await fetchBarOrders();
+            if (fetchTables) await fetchTables();
+          }}
+          onOrderUpdated={async () => {
+            await fetchPosOrders();
+            if (fetchKitchenOrders) await fetchKitchenOrders();
+            await fetchBarOrders();
+            if (fetchTables) await fetchTables();
+          }}
+          onSuccess={async () => {
+            await fetchPosOrders();
+            if (fetchKitchenOrders) await fetchKitchenOrders();
+            await fetchBarOrders();
+            if (fetchTables) await fetchTables();
+          }}
+        />
+      )}
+
     </>
   );
 }
