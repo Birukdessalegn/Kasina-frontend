@@ -1,3 +1,5 @@
+import { parseItemPortion } from "./drinkServingHelper";
+
 /**
  * 100% Reliable Cross-Browser Print Helper
  * Uses an isolated printing iframe to guarantee the document never closes prematurely,
@@ -778,6 +780,219 @@ export const printPayslip = (item, periodMonth = "") => {
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
   }, 400);
+};
+
+/**
+ * 100% Reliable Official Order Receipt & Guest Check Printer (80mm POS & Standard)
+ */
+export const printOrderReceipt = (order, options = {}) => {
+  if (!order) return;
+
+  const oldIframe = document.getElementById("kasina-order-print-frame");
+  if (oldIframe) oldIframe.remove();
+
+  const iframe = document.createElement("iframe");
+  iframe.id = "kasina-order-print-frame";
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+  document.body.appendChild(iframe);
+
+  const restaurantName = options.restaurantName || "KASINA HOTEL";
+  const restaurantSub = options.restaurantSub || "HOTEL & RESTAURANT";
+  const orderNum = order.order_number || `#${order.id || "POS"}`;
+  const tableNum = String(order.table_number || order.table_id || "1").replace(/^T/i, "T");
+  const waiterName = [
+    order.waiter_first_name,
+    order.waiter_last_name
+  ].filter(Boolean).join(" ") || order.waiter_name || order.waiterName || options.waiterName || "Staff Waiter";
+
+  const customerName = order.customer_name || order.customerName || order.vip_name || order.vip_customer_name || "";
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  const netSubtotal = items.reduce((sum, i) => {
+    const q = Number(i.quantity ?? i.qty ?? 1);
+    const p = Number(i.unit_price ?? i.price ?? i.product_price ?? 0);
+    return sum + q * p;
+  }, 0);
+
+  const recordedTotal = Number(
+    order.total_amount ??
+    order.total ??
+    order.grand_total ??
+    order.grandTotal ??
+    0
+  );
+
+  const tax = Number(order.tax ?? order.tax_amount ?? 0);
+  const service = Number(order.service_charge ?? order.service_charge_amount ?? 0);
+  const discount = Number(order.discount ?? order.discount_amount ?? 0);
+
+  let grossTotal = recordedTotal > 0 ? recordedTotal : Math.max(netSubtotal - discount, 0);
+  let vatAmount = Number((grossTotal - (grossTotal / 1.15)).toFixed(2));
+  let baseNet = Number((grossTotal / 1.15).toFixed(2));
+  let serviceCharge = service;
+
+  const pStatus = String(order.payment_status || "unpaid").toUpperCase();
+  const pMethod = String(order.payment_method || order.paymentMethod || "CASH").toUpperCase();
+  const dateStr = order.created_at ? new Date(order.created_at).toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }) : new Date().toLocaleString();
+
+  const title = options.title || (
+    pStatus === "PAID"
+      ? "OFFICIAL SALES RECEIPT"
+      : pStatus.includes("CREDIT")
+      ? "VIP CREDIT TICKET"
+      : "GUEST CHECK / BILL"
+  );
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Receipt - ${orderNum}</title>
+        <style>
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', Courier, monospace, system-ui, sans-serif;
+            width: 76mm;
+            margin: 0 auto;
+            padding: 8px 4px;
+            color: #000;
+            font-size: 11px;
+            line-height: 1.35;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .font-bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .double-divider { border-top: 2px solid #000; margin: 6px 0; }
+          .flex-between { display: flex; justify-content: space-between; align-items: baseline; }
+          .item-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 10px; }
+          .item-name { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div style="font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">${restaurantName}</div>
+          <div style="font-size: 9px; color: #333; text-transform: uppercase; margin-top: 1px;">${restaurantSub}</div>
+          <div style="font-size: 10px; font-weight: 900; margin: 4px 0 2px 0;">*** ${title} ***</div>
+          <div style="font-size: 11px; font-weight: bold;">Order: ${orderNum} • Table #${tableNum}</div>
+          <div style="font-size: 9px; color: #444; margin-top: 1px;">${dateStr}</div>
+          ${waiterName ? `<div style="font-size: 9px; margin-top: 1px;">Server: <b>${waiterName}</b></div>` : ""}
+          ${customerName ? `<div style="font-size: 9px; font-weight: bold; margin-top: 1px;">Customer: ${customerName}</div>` : ""}
+        </div>
+
+        <div class="divider"></div>
+
+        <div style="font-size: 9px; font-weight: bold; margin-bottom: 4px;" class="flex-between">
+          <span>QTY  ITEM</span>
+          <span>AMOUNT</span>
+        </div>
+
+        ${items.length > 0 ? items.map(it => {
+          const q = Number(it.quantity ?? it.qty ?? 1);
+          const p = Number(it.unit_price ?? it.price ?? 0);
+          const lineTotal = Number(it.total ?? (q * p));
+          const name = it.name || it.product_name || "Item";
+          const portion = parseItemPortion(it);
+          return `
+            <div class="item-row">
+              <div class="item-name">
+                <span><b>${portion.displayServing}</b> ${name}</span>
+                ${p > 0 ? `<span style="font-size: 8px; color: #555;"> (@${p.toFixed(2)})</span>` : ""}
+              </div>
+              <span class="font-bold">${lineTotal.toFixed(2)}</span>
+            </div>
+          `;
+        }).join("") : `
+          <div style="font-size: 10px; text-align: center; color: #555; padding: 4px 0;">
+            1x Order Items
+          </div>
+        `}
+
+        <div class="divider"></div>
+
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Items Total (Menu Price):</span>
+          <span>${(grossTotal + discount).toFixed(2)} ETB</span>
+        </div>
+        ${discount > 0 ? `
+          <div class="flex-between" style="font-size: 10px; margin-bottom: 2px; color: #666;">
+            <span>Discount:</span>
+            <span>-${discount.toFixed(2)} ETB</span>
+          </div>
+        ` : ""}
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px; color: #555;">
+          <span>Net Base (Excl. VAT):</span>
+          <span>${baseNet.toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between font-bold" style="font-size: 10px; margin-bottom: 2px;">
+          <span>15% VAT (Included in Price):</span>
+          <span>${vatAmount.toFixed(2)} ETB</span>
+        </div>
+        ${serviceCharge > 0 ? `
+          <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+            <span>Service Charge:</span>
+            <span>+${serviceCharge.toFixed(2)} ETB</span>
+          </div>
+        ` : ""}
+
+        <div class="double-divider"></div>
+
+        <div class="flex-between font-bold" style="font-size: 14px; margin: 4px 0;">
+          <span>TOTAL (INCL. 15% VAT):</span>
+          <span>${grossTotal.toFixed(2)} ETB</span>
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Payment Status:</span>
+          <span style="font-weight: 900;">${pStatus}</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Payment Method:</span>
+          <span style="font-weight: bold;">${pMethod}</span>
+        </div>
+        ${order.reference ? `
+          <div class="flex-between" style="font-size: 9px; color: #444; margin-bottom: 2px;">
+            <span>Reference:</span>
+            <span>${order.reference}</span>
+          </div>
+        ` : ""}
+
+        <div class="divider"></div>
+
+        <div class="text-center" style="font-size: 9px; margin-top: 6px; color: #222;">
+          <div>Thank you for dining with us!</div>
+          <div style="font-size: 8px; color: #666; margin-top: 2px;">Please retain this receipt.</div>
+        </div>
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }, 300);
 };
 
 
