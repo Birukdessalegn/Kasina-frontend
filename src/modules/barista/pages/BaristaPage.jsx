@@ -514,10 +514,14 @@ function BaristaPage() {
       {/* New Order Alert Modal */}
       {alertOrder && (
         <NewOrderAlertModal
-          isOpen={!!alertOrder}
-          onClose={() => setAlertOrder(null)}
           order={alertOrder}
-          title="New Coffee Order Received!"
+          department="barista"
+          onAccept={(ord) => {
+            updateOrderStatus(ord?.id || alertOrder.id, "preparing");
+            setAlertOrder(null);
+          }}
+          onDismiss={() => setAlertOrder(null)}
+          onClose={() => setAlertOrder(null)}
         />
       )}
     </div>

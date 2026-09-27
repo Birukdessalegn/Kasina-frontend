@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { Flame, Wine, Clock, CheckCircle2, Volume2, X } from "lucide-react";
+import { Flame, Wine, Clock, CheckCircle2, Volume2, X, Coffee } from "lucide-react";
 import audioService from "../../services/audioService";
 
-function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss }) {
+function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss, onClose }) {
   useEffect(() => {
     if (order) {
       audioService.playNewOrderSound();
@@ -11,6 +11,12 @@ function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss
 
   if (!order) return null;
 
+  const handleDismiss = () => {
+    if (onDismiss) onDismiss();
+    if (onClose) onClose();
+  };
+
+  const isBarista = department === "barista" || department === "coffee";
   const isKitchen = department === "kitchen";
   let rawItems = order.items || order.order_items || [];
   if (typeof rawItems === "string") {
@@ -24,16 +30,24 @@ function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl border-4 border-amber-400 overflow-hidden">
+      <div className={`w-full max-w-xl rounded-3xl bg-white shadow-2xl border-4 overflow-hidden ${
+        isBarista ? "border-amber-500" : isKitchen ? "border-amber-400" : "border-indigo-400"
+      }`}>
         {/* HEADER BAR */}
         <div
           className={`flex items-center justify-between px-6 py-5 text-white ${
-            isKitchen ? "bg-amber-600" : "bg-indigo-600"
+            isBarista
+              ? "bg-gradient-to-r from-amber-700 to-amber-900"
+              : isKitchen
+              ? "bg-amber-600"
+              : "bg-indigo-600"
           }`}
         >
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm animate-bounce">
-              {isKitchen ? (
+              {isBarista ? (
+                <Coffee className="h-7 w-7 text-amber-100" />
+              ) : isKitchen ? (
                 <Flame className="h-7 w-7 text-amber-100" />
               ) : (
                 <Wine className="h-7 w-7 text-indigo-100" />
@@ -41,7 +55,11 @@ function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss
             </div>
             <div>
               <span className="text-xs font-bold uppercase tracking-widest text-white/80">
-                {isKitchen ? "NEW KITCHEN ORDER RECEIVED" : "NEW DRINK ORDER RECEIVED"}
+                {isBarista
+                  ? "NEW COFFEE / BEVERAGE ORDER RECEIVED"
+                  : isKitchen
+                  ? "NEW KITCHEN ORDER RECEIVED"
+                  : "NEW DRINK ORDER RECEIVED"}
               </span>
               <h2 className="text-2xl font-extrabold tracking-tight">
                 {order.order_number || `#ORD-${order.id}`}
@@ -60,7 +78,7 @@ function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss
             </button>
             <button
               type="button"
-              onClick={onDismiss}
+              onClick={handleDismiss}
               className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 text-white transition"
             >
               <X className="h-5 w-5" />
@@ -159,8 +177,8 @@ function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss
         <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
           <button
             type="button"
-            onClick={onDismiss}
-            className="flex-1 rounded-xl border border-slate-200 bg-white py-3.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+            onClick={handleDismiss}
+            className="flex-1 rounded-xl border border-slate-200 bg-white py-3.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
           >
             Dismiss Alert
           </button>
@@ -168,11 +186,13 @@ function NewOrderAlertModal({ order, department = "kitchen", onAccept, onDismiss
           <button
             type="button"
             onClick={() => {
-              onAccept(order);
-              onDismiss();
+              if (onAccept) onAccept(order);
+              handleDismiss();
             }}
-            className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-extrabold text-white shadow-lg transition ${
-              isKitchen
+            className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-extrabold text-white shadow-lg transition cursor-pointer ${
+              isBarista
+                ? "bg-amber-700 hover:bg-amber-800 shadow-amber-700/30"
+                : isKitchen
                 ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/30"
                 : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30"
             }`}
