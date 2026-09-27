@@ -133,7 +133,7 @@ const navigationGroups = [
             icon: ShoppingCart,
           },
           {
-            name: "My Served Orders",
+            name: " Served Orders",
             path: "/pos/served-orders",
             icon: CheckCircle2,
           },
@@ -224,11 +224,11 @@ const navigationGroups = [
             path: "/bar",
             icon: Wine,
           },
-          // {
-          //   name: "Bar Order Terminal",
-          //   path: "/pos",
-          //   icon: ShoppingCart,
-          // },
+          {
+            name: "Menu Page",
+            path: "/pos",
+            icon: ShoppingCart,
+          },
           {
             name: "Bar Reports",
             path: "/bar/reports",
@@ -413,6 +413,11 @@ function DashboardLayout() {
   */
 
   const normalizedRole = user?.role?.toUpperCase() || "USER";
+  const userPosition = (user?.position_title || user?.position || "").toLowerCase();
+  const isBartender =
+    normalizedRole === "BARTENDER" ||
+    user?.role_id === 8 ||
+    userPosition.includes("bartender");
 
   const displayName =
     user?.name ||
@@ -468,6 +473,10 @@ function DashboardLayout() {
     const path = location.pathname;
 
     const menusToOpen = {};
+
+    if (isBartender) {
+      menusToOpen["Bar"] = true;
+    }
 
     navigationGroups.forEach((group) => {
       group.items.forEach((item) => {
@@ -575,24 +584,31 @@ function DashboardLayout() {
 
   let activeGroupTitle = "Overview";
 
-  for (const group of navigationGroups) {
-    for (const item of group.items) {
-      if (item.path === currentPath) {
-        activeItemName = item.name;
+  if (isBartender) {
+    activeGroupTitle = "Bar";
+    if (currentPath === "/pos") activeItemName = "Menu Page";
+    else if (currentPath === "/bar/reports") activeItemName = "Bar Reports";
+    else activeItemName = "Bar Display";
+  } else {
+    for (const group of navigationGroups) {
+      for (const item of group.items) {
+        if (item.path === currentPath) {
+          activeItemName = item.name;
 
-        activeGroupTitle = group.title;
-      }
+          activeGroupTitle = group.title;
+        }
 
-      if (item.children) {
-        const child = item.children.find(
-          (childItem) =>
-            childItem.path === currentPath
-        );
+        if (item.children) {
+          const child = item.children.find(
+            (childItem) =>
+              childItem.path === currentPath
+          );
 
-        if (child) {
-          activeItemName = child.name;
+          if (child) {
+            activeItemName = child.name;
 
-          activeGroupTitle = item.name;
+            activeGroupTitle = item.name;
+          }
         }
       }
     }
@@ -605,6 +621,13 @@ function DashboardLayout() {
   const visibleNavigationGroups =
     navigationGroups
       .filter((group) => {
+        /*
+          Bartender strictly only sees the Operations group
+        */
+        if (isBartender) {
+          return group.title === "Operations";
+        }
+
         /*
           Finance roles are not allowed to see the Administration sidebar (HR, Attendance, etc.)
         */
@@ -621,6 +644,12 @@ function DashboardLayout() {
       .map((group) => {
         const visibleItems = group.items
           .filter((item) => {
+            /*
+              Bartender strictly sees ONLY Bar under Operations
+            */
+            if (isBartender) {
+              return item.name === "Bar";
+            }
             /*
               Hide HR & employee items for finance roles
             */
