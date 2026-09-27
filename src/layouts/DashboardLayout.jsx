@@ -418,6 +418,13 @@ function DashboardLayout() {
     normalizedRole === "BARTENDER" ||
     user?.role_id === 8 ||
     userPosition.includes("bartender");
+  const isWaiter =
+    normalizedRole === "WAITER" ||
+    normalizedRole === "CAFE_WAITER" ||
+    normalizedRole === "BAR_WAITER" ||
+    normalizedRole === "RESTAURANT_WAITER" ||
+    user?.role_id === 6 ||
+    userPosition.includes("waiter");
 
   const displayName =
     user?.name ||
@@ -743,10 +750,18 @@ function DashboardLayout() {
           .map((item) => {
             if (item.children) {
               const visibleChildren = item.children.filter((child) => {
-                if (normalizedRole === "WAITER") {
+                if (
+                  isWaiter ||
+                  normalizedRole === "WAITER" ||
+                  normalizedRole === "CAFE_WAITER" ||
+                  normalizedRole === "BAR_WAITER" ||
+                  normalizedRole === "RESTAURANT_WAITER" ||
+                  userPosition.includes("waiter")
+                ) {
                   const hiddenWaiterPaths = [
                     "/employees/attendance",
                     "/pos/sales-audit",
+                    "/pos/reconciliation",
                     "/pos/tables",
                     "/finance/cashier-reconciliation",
                     "/pos/reports",
@@ -754,6 +769,16 @@ function DashboardLayout() {
                   ];
                   if (hiddenWaiterPaths.includes(child.path)) {
                     return false;
+                  }
+                  const childNameLower = (child.name || "").toLowerCase();
+                  if (
+                    childNameLower.includes("reconciliation") ||
+                    childNameLower.includes("audit") ||
+                    childNameLower.includes("reports")
+                  ) {
+                    if (child.path !== "/pos/served-orders" && child.path !== "/pos") {
+                      return false;
+                    }
                   }
                 }
                 if (normalizedRole === "CASHIER") {

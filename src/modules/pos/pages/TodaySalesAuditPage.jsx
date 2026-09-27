@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import {
   Search,
   RefreshCw,
@@ -28,6 +29,21 @@ import { printReportArea } from "../../../utils/printHelper";
 
 function TodaySalesAuditPage() {
   const { user } = useAuth();
+
+  const userRoleUpper = (user?.role || "").toUpperCase();
+  const userPosition = (user?.position_title || user?.position || "").toLowerCase();
+  const isWaiter =
+    userRoleUpper === "WAITER" ||
+    userRoleUpper === "CAFE_WAITER" ||
+    userRoleUpper === "BAR_WAITER" ||
+    userRoleUpper === "RESTAURANT_WAITER" ||
+    user?.role_id === 6 ||
+    userPosition.includes("waiter");
+
+  if (isWaiter) {
+    return <Navigate to="/pos/served-orders" replace />;
+  }
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

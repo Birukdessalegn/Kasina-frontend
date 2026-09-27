@@ -58,6 +58,9 @@ function POSLayout() {
   const isWaiter =
     userRoleUpper === "WAITER" ||
     userRoleUpper === "CAFE_WAITER" ||
+    userRoleUpper === "BAR_WAITER" ||
+    userRoleUpper === "RESTAURANT_WAITER" ||
+    user?.role_id === 6 ||
     userPosition.includes("waiter");
 
   const visibleMenuItems = menuItems.filter((item) => {
