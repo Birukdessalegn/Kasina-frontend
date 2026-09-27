@@ -54,7 +54,7 @@ const roles = [
   { id: 15, name: "cafe_waiter", label: "Cafe Waiter" },
   { id: 16, name: "cashier", label: "Cashier" },
   { id: 17, name: "waiter", label: "Waiter" },
-  { id: 18, name: "chef", label: "Chef" },
+  { id: 18, name: "chef", label: "Restaurant Chef" },
   { id: 19, name: "bartender", label: "Bartender" },
   { id: 20, name: "fb_controller", label: "F&B Controller / Kitchen Auditor" },
   { id: 21, name: "receptionist", label: "Receptionist / Front Desk" },
@@ -329,7 +329,13 @@ function EmployeesPage() {
           }));
           setPositionsList(cleaned);
         }
-      if (roleRes?.roles) setRolesList(roleRes.roles);
+      if (roleRes?.roles) {
+        const cleanedRoles = roleRes.roles.map((r) => ({
+          ...r,
+          label: r.name?.toLowerCase() === "chef" ? "Restaurant Chef" : (r.label || r.name),
+        }));
+        setRolesList(cleanedRoles);
+      }
       if (deptRes?.departments) setDepartmentsList(deptRes.departments);
 
       const list =
@@ -1129,17 +1135,20 @@ function EmployeesPage() {
                             <p className="text-sm font-semibold text-gray-900">
                               {positionTitle || "-"}
                             </p>
-                            <span className="inline-block mt-0.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium capitalize text-blue-700">
-                              {(() => {
-                                const r =
-                                  employee.role?.name ||
-                                  employee.role_name ||
-                                  employee.roleName ||
-                                  (typeof employee.role === "string" ? employee.role : null) ||
-                                  "-";
-                                return r.toLowerCase() === "fb_controller" ? "F&B Controller" : r;
-                              })()}
-                            </span>
+                              <span className="inline-block mt-0.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium capitalize text-blue-700">
+                                {(() => {
+                                  const r =
+                                    employee.role?.name ||
+                                    employee.role_name ||
+                                    employee.roleName ||
+                                    (typeof employee.role === "string" ? employee.role : null) ||
+                                    "-";
+                                  const rLower = r.toLowerCase();
+                                  if (rLower === "fb_controller") return "F&B Controller";
+                                  if (rLower === "chef") return "Restaurant Chef";
+                                  return r;
+                                })()}
+                              </span>
                           </div>
                         </td>
 
@@ -1726,11 +1735,17 @@ function EmployeesPage() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                     >
                       <option value="">Select role</option>
-                      {(rolesList.length > 0 ? rolesList : roles).map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.label || (role.name.charAt(0).toUpperCase() + role.name.slice(1))}
-                        </option>
-                      ))}
+                      {(rolesList.length > 0 ? rolesList : roles).map((role) => {
+                        const displayLabel =
+                          role.name?.toLowerCase() === "chef"
+                            ? "Restaurant Chef"
+                            : (role.label || (role.name.charAt(0).toUpperCase() + role.name.slice(1).replace(/_/g, " ")));
+                        return (
+                          <option key={role.id} value={role.id}>
+                            {displayLabel}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -1934,9 +1949,13 @@ function EmployeesPage() {
                     </p>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="text-sm capitalize text-gray-600">
-                        {String(selectedEmployee.role || "").toLowerCase() === "fb_controller"
-                          ? "F&B Controller"
-                          : selectedEmployee.role || "-"}
+                        {(() => {
+                          const r = String(selectedEmployee.role || "");
+                          const rLower = r.toLowerCase();
+                          if (rLower === "fb_controller") return "F&B Controller";
+                          if (rLower === "chef") return "Restaurant Chef";
+                          return r || "-";
+                        })()}
                       </span>
                       <span className="text-gray-300">•</span>
                       <span className="text-sm text-gray-600">

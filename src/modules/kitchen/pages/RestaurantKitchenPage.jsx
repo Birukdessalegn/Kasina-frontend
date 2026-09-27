@@ -139,7 +139,7 @@ export default function RestaurantKitchenPage() {
             Restaurant Kitchen Display (KDS)
           </h1>
           <p className="text-xs sm:text-sm text-blue-200/80 mt-1">
-            Dedicated preparation screen for Line Chef &amp; Restaurant Supervisor. Displays main courses, steaks, traditional dinners &amp; table orders.
+            Dedicated preparation screen for Restaurant Chef &amp; Restaurant Supervisor. Displays main courses, steaks, traditional dinners &amp; table orders.
           </p>
         </div>
 
