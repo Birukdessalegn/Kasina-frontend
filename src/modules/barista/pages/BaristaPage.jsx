@@ -16,10 +16,12 @@ import {
   ClipboardList,
   Layers,
   Filter,
+  PackagePlus,
 } from "lucide-react";
 import api from "../../../services/api";
 import audioService from "../../../services/audioService";
 import NewOrderAlertModal from "../../../components/common/NewOrderAlertModal";
+import StockRequestModal from "../../inventory/components/StockRequestModal";
 
 function BaristaPage() {
   const location = useLocation();
@@ -29,6 +31,7 @@ function BaristaPage() {
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [alertOrder, setAlertOrder] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showStockRequestModal, setShowStockRequestModal] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // "all" | "new" | "preparing" | "ready"
   const [filterMode, setFilterMode] = useState("coffee"); // "coffee" | "all"
   const [searchQuery, setSearchQuery] = useState("");
@@ -346,10 +349,19 @@ function BaristaPage() {
           {/* Manual Refresh */}
           <button
             onClick={fetchOrders}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 cursor-pointer"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-amber-600" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          {/* Request Stock / Requisition */}
+          <button
+            onClick={() => setShowStockRequestModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:from-amber-600 hover:to-amber-700 transition cursor-pointer"
+          >
+            <PackagePlus className="h-4 w-4" />
+            <span>Request Stock</span>
           </button>
         </div>
       </div>
@@ -524,6 +536,13 @@ function BaristaPage() {
           onClose={() => setAlertOrder(null)}
         />
       )}
+
+      {/* Stock Requisition Modal */}
+      <StockRequestModal
+        isOpen={showStockRequestModal}
+        onClose={() => setShowStockRequestModal(false)}
+        initialDepartment="barista"
+      />
     </div>
   );
 }

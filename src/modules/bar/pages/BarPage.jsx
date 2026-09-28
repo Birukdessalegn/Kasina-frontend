@@ -21,10 +21,12 @@ import {
   Droplets,
   GlassWater,
   Search,
+  PackagePlus,
 } from "lucide-react";
 import api from "../../../services/api";
 import audioService from "../../../services/audioService";
 import NewOrderAlertModal from "../../../components/common/NewOrderAlertModal";
+import StockRequestModal from "../../inventory/components/StockRequestModal";
 import { formatImageUrl, getCustomShotsMap } from "../../products/ProductsPage";
 
 function BarPage() {
@@ -36,6 +38,7 @@ function BarPage() {
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [alertOrder, setAlertOrder] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showStockRequestModal, setShowStockRequestModal] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [viewMode, setViewMode] = useState("cards"); // "cards" | "list"
   const [mainSectionTab, setMainSectionTab] = useState("orders"); // "orders" | "inventory"
@@ -610,6 +613,15 @@ function BarPage() {
             />
 
             Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowStockRequestModal(true)}
+            className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-purple-700 cursor-pointer"
+          >
+            <PackagePlus className="h-4 w-4" />
+            <span>Request Stock</span>
           </button>
         </div>
 
@@ -1295,6 +1307,13 @@ function BarPage() {
         department="bar"
         onAccept={(orderToAccept) => updateOrderStatus(orderToAccept.id, "preparing")}
         onDismiss={() => setAlertOrder(null)}
+      />
+
+      {/* Stock Requisition Modal */}
+      <StockRequestModal
+        isOpen={showStockRequestModal}
+        onClose={() => setShowStockRequestModal(false)}
+        initialDepartment="bar"
       />
     </div>
   );

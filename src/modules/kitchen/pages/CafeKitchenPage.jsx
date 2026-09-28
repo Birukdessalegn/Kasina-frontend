@@ -9,17 +9,20 @@ import {
   RefreshCw,
   Search,
   BellRing,
-  Utensils
+  Utensils,
+  PackagePlus,
 } from "lucide-react";
 import api from "../../../services/api";
 import audioService from "../../../services/audioService";
 import NewOrderAlertModal from "../../../components/common/NewOrderAlertModal";
+import StockRequestModal from "../../inventory/components/StockRequestModal";
 
 export default function CafeKitchenPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [alertOrder, setAlertOrder] = useState(null);
+  const [showStockRequestModal, setShowStockRequestModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState("active"); // "active" | "pending" | "preparing" | "ready" | "history"
   const [searchQuery, setSearchQuery] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -151,6 +154,14 @@ export default function CafeKitchenPage() {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
+          </button>
+
+          <button
+            onClick={() => setShowStockRequestModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
+          >
+            <PackagePlus className="h-4 w-4" />
+            <span>Request Stock</span>
           </button>
         </div>
       </div>
@@ -405,6 +416,13 @@ export default function CafeKitchenPage() {
       <NewOrderAlertModal
         order={alertOrder}
         onClose={() => setAlertOrder(null)}
+      />
+
+      {/* Stock Requisition Modal */}
+      <StockRequestModal
+        isOpen={showStockRequestModal}
+        onClose={() => setShowStockRequestModal(false)}
+        initialDepartment="cafe"
       />
     </div>
   );

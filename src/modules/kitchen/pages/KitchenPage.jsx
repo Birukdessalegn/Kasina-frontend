@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
-import { BarChart3, Package, Flame, UtensilsCrossed } from "lucide-react";
+import { BarChart3, Package, Flame, UtensilsCrossed, PackagePlus } from "lucide-react";
 import { useEffect, useState, useRef, useMemo } from "react";
 import api from "../../../services/api";
 import audioService from "../../../services/audioService";
 import NewOrderAlertModal from "../../../components/common/NewOrderAlertModal";
+import StockRequestModal from "../../inventory/components/StockRequestModal";
 
 function KitchenPage({ filterStatus = "all", pageTitle = null }) {
   const [kitchenOrders, setKitchenOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [alertOrder, setAlertOrder] = useState(null);
+  const [showStockRequestModal, setShowStockRequestModal] = useState(false);
   const [kitchenStock, setKitchenStock] = useState([]);
   const [activeTab, setActiveTab] = useState("orders"); // "orders" | "inventory"
   const [kitchenOutletFilter, setKitchenOutletFilter] = useState("all"); // "all" | "CAFE_KITCHEN" | "RESTAURANT_KITCHEN"
@@ -263,6 +265,15 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
             <BarChart3 className="h-3.5 w-3.5 text-slate-500" />
             Reports
           </Link>
+
+          <button
+            type="button"
+            onClick={() => setShowStockRequestModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:from-amber-500 hover:to-amber-600 transition cursor-pointer"
+          >
+            <PackagePlus className="h-3.5 w-3.5" />
+            <span>Request Stock</span>
+          </button>
         </div>
       </div>
 
@@ -613,6 +624,13 @@ function KitchenPage({ filterStatus = "all", pageTitle = null }) {
         department="kitchen"
         onAccept={(orderToAccept) => handleAction(orderToAccept)}
         onDismiss={() => setAlertOrder(null)}
+      />
+
+      {/* Stock Requisition Modal */}
+      <StockRequestModal
+        isOpen={showStockRequestModal}
+        onClose={() => setShowStockRequestModal(false)}
+        initialDepartment="kitchen"
       />
     </div>
   );
