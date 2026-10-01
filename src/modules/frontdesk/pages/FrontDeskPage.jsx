@@ -22,6 +22,7 @@ import {
   Filter,
   DollarSign,
   AlertCircle,
+  AlertTriangle,
   Camera,
   Upload,
   Eye,
@@ -106,7 +107,14 @@ export default function FrontDeskPage() {
   const [activeReservation, setActiveReservation] = useState(null);
 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ amount: "", payment_method: "cash", notes: "" });
+  const [selectedPaymentRoom, setSelectedPaymentRoom] = useState(null);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    payment_method: "cash",
+    transaction_reference: "",
+    notes: "",
+  });
 
   // Update Check-In / Guest ID Modal (Mobile Friendly)
   const [updateIdModalOpen, setUpdateIdModalOpen] = useState(false);
@@ -564,6 +572,162 @@ export default function FrontDeskPage() {
     }
   };
 
+  // ============================================================
+  // PAYMENT COVERAGE & UNPAID STAY DAYS WARNING LOGIC
+  // ============================================================
+  const getRoomPaymentAlert = (room) => {
+    if (!room) return null;
+    if (room.status !== "occupied" && room.status !== "reserved") return null;
+    if (!room.current_reservation_id) return null;
+
+    const totalAmt = Number(room.total_amount || 0);
+    const paidAmt = Number(room.paid_amount || 0);
+    const balance = Math.max(0, totalAmt - paidAmt);
+
+    // If zero balance or marked paid and paidAmt >= totalAmt
+    if (balance <= 0 || (room.payment_status === "paid" && paidAmt >= totalAmt)) return null;
+
+    const totalNights = Math.max(1, Number(room.total_nights || 1));
+    let nightlyRate = Number(room.rate_per_night || room.base_rate || 0);
+    if (nightlyRate <= 0 && totalNights > 0 && totalAmt > 0) {
+      nightlyRate = totalAmt / totalNights;
+    }
+    if (nightlyRate <= 0) return null;
+
+    const paidNights = Math.floor(paidAmt / nightlyRate);
+    const unpaidNights = Math.max(0, totalNights - paidNights);
+
+    const checkInRaw = String(room.check_in_date || "").split("T")[0];
+    if (!checkInRaw) return null;
+    const parts = checkInRaw.split("-").map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const [y, m, d] = parts;
+
+    // Check-in date in UTC
+    const checkInDate = new Date(Date.UTC(y, m - 1, d));
+    const paidThroughDate = new Date(checkInDate.getTime() + paidNights * 86400000);
+    const paidThroughStr = paidThroughDate.toISOString().split("T")[0];
+
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const diffDays = Math.round((paidThroughDate.getTime() - todayUTC.getTime()) / 86400000);
+
+    if (diffDays < 0) {
+      const daysOverdue = Math.abs(diffDays);
+      return {
+        severity: "expired",
+        diffDays,
+        paidThroughStr,
+        paidNights,
+        unpaidNights,
+        nightlyRate,
+        balance,
+        paidAmt,
+        totalAmt,
+        message: `Payment Expired! Covered ${paidNights} night(s) to ${paidThroughStr} (${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'} overdue). Remaining ${unpaidNights} night(s) unpaid (${balance.toLocaleString()} ETB).`,
+        badgeText: `Expired (${daysOverdue}d ago)`,
+      };
+    } else if (diffDays === 0) {
+      return {
+        severity: "due_today",
+        diffDays,
+        paidThroughStr,
+        paidNights,
+        unpaidNights,
+        nightlyRate,
+        balance,
+        paidAmt,
+        totalAmt,
+        message: `Payment expires TODAY! Covered through ${paidThroughStr}. Remind guest to pay for remaining ${unpaidNights} night(s) (${balance.toLocaleString()} ETB).`,
+        badgeText: `Expires Today`,
+      };
+    } else if (diffDays === 1) {
+      return {
+        severity: "due_tomorrow",
+        diffDays,
+        paidThroughStr,
+        paidNights,
+        unpaidNights,
+        nightlyRate,
+        balance,
+        paidAmt,
+        totalAmt,
+        message: `Payment due tomorrow (${paidThroughStr}). Covered for ${paidNights} night(s). Remind guest to settle next ${unpaidNights} night(s) (${balance.toLocaleString()} ETB).`,
+        badgeText: `Due Tomorrow`,
+      };
+    } else {
+      return {
+        severity: "partial",
+        diffDays,
+        paidThroughStr,
+        paidNights,
+        unpaidNights,
+        nightlyRate,
+        balance,
+        paidAmt,
+        totalAmt,
+        message: `Partially paid: Covered through ${paidThroughStr} (${paidNights} nights). Remaining ${unpaidNights} night(s) (${balance.toLocaleString()} ETB) due on ${paidThroughStr}.`,
+        badgeText: `Paid thru ${paidThroughStr}`,
+      };
+    }
+  };
+
+  // Rooms that have payment expired, due today, or due tomorrow
+  const unpaidAlertRooms = useMemo(() => {
+    return rooms.filter((r) => {
+      if (r.status !== "occupied" && r.status !== "reserved") return false;
+      const alert = getRoomPaymentAlert(r);
+      return alert && (alert.severity === "expired" || alert.severity === "due_today" || alert.severity === "due_tomorrow");
+    });
+  }, [rooms]);
+
+  // Open Payment Collection Modal
+  const handleOpenPaymentModal = (room) => {
+    if (!room.current_reservation_id) {
+      showToast("No active reservation found on this room", "error");
+      return;
+    }
+    setSelectedPaymentRoom(room);
+    const totalAmt = Number(room.total_amount || 0);
+    const paidAmt = Number(room.paid_amount || 0);
+    const balance = Math.max(0, totalAmt - paidAmt);
+    setPaymentForm({
+      amount: balance > 0 ? String(balance) : "",
+      payment_method: "cash",
+      transaction_reference: "",
+      notes: "",
+    });
+    setPaymentModalOpen(true);
+  };
+
+  // Submit Payment Collection
+  const handleConfirmPayment = async (e) => {
+    e.preventDefault();
+    if (!selectedPaymentRoom?.current_reservation_id) return;
+    const payAmt = Number(paymentForm.amount);
+    if (isNaN(payAmt) || payAmt <= 0) {
+      showToast("Please enter a valid payment amount", "error");
+      return;
+    }
+    try {
+      setSubmittingPayment(true);
+      await addReservationPayment(selectedPaymentRoom.current_reservation_id, {
+        amount: payAmt,
+        payment_method: paymentForm.payment_method,
+        transaction_reference: paymentForm.transaction_reference,
+        notes: paymentForm.notes,
+      });
+      showToast(`Payment of ${payAmt.toLocaleString()} ETB recorded for Room #${selectedPaymentRoom.room_number}!`);
+      setPaymentModalOpen(false);
+      setSelectedPaymentRoom(null);
+      loadData();
+    } catch (err) {
+      showToast(err.message || "Failed to record payment", "error");
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
   return (
     <div className="w-full space-y-4 sm:space-y-5">
       {/* Toast Notification */}
@@ -708,6 +872,74 @@ export default function FrontDeskPage() {
         </div>
       </div>
 
+      {/* PAYMENT COVERAGE & UNPAID STAY ALERT BANNER */}
+      {unpaidAlertRooms.length > 0 && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/85 p-3.5 sm:p-4 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-rose-200/60 pb-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-600 text-white shadow-xs shrink-0">
+                <AlertCircle size={18} />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-rose-950">
+                  Payment Attention Required ({unpaidAlertRooms.length} {unpaidAlertRooms.length === 1 ? "Room" : "Rooms"} with Expired or Due Stay Periods)
+                </h3>
+                <p className="text-[11px] text-rose-700">
+                  Guests below have stayed past their prepaid nights or payment coverage expires today/tomorrow. Collect balance to keep lodging up to date.
+                </p>
+              </div>
+            </div>
+            <span className="self-start sm:self-center inline-flex items-center gap-1 rounded-full bg-rose-200/80 px-2.5 py-0.5 text-[10px] font-black text-rose-900 border border-rose-300">
+              <Clock size={11} /> {unpaidAlertRooms.length} Pending Settlement
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {unpaidAlertRooms.map((r) => {
+              const alert = getRoomPaymentAlert(r);
+              if (!alert) return null;
+              const isExpired = alert.severity === "expired";
+              return (
+                <div
+                  key={r.id}
+                  className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 bg-white shadow-2xs ${
+                    isExpired ? "border-rose-300 ring-1 ring-rose-200" : "border-amber-200"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-extrabold text-slate-900 text-xs">
+                        #{r.room_number}
+                      </span>
+                      <span className={`rounded px-1.5 py-0.2 text-[8px] font-black uppercase ${
+                        isExpired ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-900"
+                      }`}>
+                        {alert.badgeText}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-semibold text-slate-800 truncate mt-0.5">
+                      {r.guest_name || "Guest"}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Paid to <strong className="text-slate-700">{alert.paidThroughStr}</strong> • <strong className="text-rose-600">{alert.balance.toLocaleString()} ETB</strong> ({alert.unpaidNights}n unpaid)
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPaymentModal(r)}
+                    className="shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition flex items-center gap-1 shadow-2xs"
+                  >
+                    <DollarSign size={12} />
+                    Collect
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ROOMS HIGH-DENSITY COMPACT GRID */}
       {loading ? (
         <div className="flex h-64 items-center justify-center">
@@ -727,6 +959,10 @@ export default function FrontDeskPage() {
         <div className="w-full grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
           {filteredRooms.map((room) => {
             const config = STATUS_CONFIG[room.status] || STATUS_CONFIG.available;
+            const paymentAlert = getRoomPaymentAlert(room);
+            const isAlertUrgent = paymentAlert && (paymentAlert.severity === "expired" || paymentAlert.severity === "due_today");
+            const isAlertWarning = paymentAlert && paymentAlert.severity === "due_tomorrow";
+
             return (
               <div
                 key={room.id}
@@ -735,7 +971,13 @@ export default function FrontDeskPage() {
                     handleOpenReservedDetails(room);
                   }
                 }}
-                className={`relative flex flex-col justify-between rounded-xl border ${config.border} bg-white p-2 sm:p-2.5 shadow-2xs transition hover:shadow-md ${
+                className={`relative flex flex-col justify-between rounded-xl border bg-white p-2 sm:p-2.5 shadow-2xs transition hover:shadow-md ${
+                  isAlertUrgent
+                    ? "border-rose-300 ring-2 ring-rose-400/60 shadow-rose-100"
+                    : isAlertWarning
+                    ? "border-amber-300 ring-2 ring-amber-300/60 shadow-amber-100"
+                    : config.border
+                } ${
                   room.status === "reserved" ? "cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-300/40" : ""
                 }`}
               >
@@ -773,7 +1015,6 @@ export default function FrontDeskPage() {
                           <User size={11} className="text-rose-600 shrink-0" />
                           <span className="truncate text-[10px] text-slate-900">{room.guest_name}</span>
                         </div>
-                        
                       </div>
 
                       {room.guest_phone && (
@@ -789,6 +1030,45 @@ export default function FrontDeskPage() {
                           {room.check_out_date?.split("T")[0]}
                         </span>
                       </div>
+
+                      {/* Payment Coverage & Balance Badge */}
+                      {paymentAlert && (
+                        <div className={`rounded border p-1 text-[8.5px] leading-tight space-y-0.5 ${
+                          paymentAlert.severity === "expired"
+                            ? "border-rose-300 bg-rose-100/90 text-rose-950 font-bold"
+                            : paymentAlert.severity === "due_today"
+                            ? "border-rose-200 bg-rose-100 text-rose-900 font-bold"
+                            : paymentAlert.severity === "due_tomorrow"
+                            ? "border-amber-200 bg-amber-100 text-amber-900 font-bold"
+                            : "border-blue-200 bg-blue-50 text-blue-900"
+                        }`}>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="flex items-center gap-0.5 truncate">
+                              {paymentAlert.severity === "expired" || paymentAlert.severity === "due_today" ? (
+                                <AlertCircle size={9} className="text-rose-600 shrink-0" />
+                              ) : (
+                                <Clock size={9} className="text-amber-600 shrink-0" />
+                              )}
+                              <span className="truncate">
+                                {paymentAlert.severity === "expired"
+                                  ? `Expired (${paymentAlert.badgeText})`
+                                  : paymentAlert.severity === "due_today"
+                                  ? "Expires Today!"
+                                  : paymentAlert.severity === "due_tomorrow"
+                                  ? "Due Tomorrow"
+                                  : `Paid to ${paymentAlert.paidThroughStr}`}
+                              </span>
+                            </span>
+                            <span className="font-mono font-extrabold text-[8px] shrink-0">
+                              {paymentAlert.balance.toLocaleString()} ETB
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[7.5px] opacity-85">
+                            <span>Covered to {paymentAlert.paidThroughStr}</span>
+                            <span>{paymentAlert.unpaidNights}n unpaid</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Guest ID Status */}
                       <div className="flex items-center justify-between border-t border-rose-100/60 pt-0.5 text-[9px]">
@@ -848,6 +1128,14 @@ export default function FrontDeskPage() {
                           {room.check_in_date?.split("T")[0]}
                         </span>
                       </div>
+
+                      {/* Payment Coverage & Balance Badge for Reserved */}
+                      {paymentAlert && (
+                        <div className="rounded border border-amber-200 bg-amber-100/70 p-1 text-[8px] leading-tight flex items-center justify-between text-amber-950">
+                          <span className="truncate">Deposit: Covered to {paymentAlert.paidThroughStr}</span>
+                          <span className="font-mono font-bold shrink-0">{paymentAlert.balance.toLocaleString()} ETB</span>
+                        </div>
+                      )}
 
                       {/* Guest ID Status */}
                       <div className="flex items-center justify-between border-t border-amber-200/60 pt-0.5 text-[9px]">
@@ -928,8 +1216,22 @@ export default function FrontDeskPage() {
                         ID
                       </button>
                       <button
+                        onClick={() => handleOpenPaymentModal(room)}
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold transition flex items-center justify-center gap-0.5 shadow-2xs ${
+                          isAlertUrgent
+                            ? "bg-rose-600 text-white hover:bg-rose-700 font-black animate-pulse"
+                            : isAlertWarning
+                            ? "bg-amber-500 text-slate-950 hover:bg-amber-400 font-black"
+                            : "bg-emerald-600 text-white hover:bg-emerald-700"
+                        }`}
+                        title="Record Payment / Settle Balance"
+                      >
+                        <DollarSign size={10} />
+                        Pay
+                      </button>
+                      <button
                         onClick={() => handleOpenCheckout(room)}
-                        className="flex-1 rounded-md bg-rose-600 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white hover:bg-rose-700 transition"
+                        className="flex-1 rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white hover:bg-slate-900 transition"
                       >
                         Check-Out
                       </button>
@@ -2338,6 +2640,247 @@ export default function FrontDeskPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          RECORD PAYMENT / SETTLE BALANCE MODAL
+      ============================================================ */}
+      {paymentModalOpen && selectedPaymentRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md">
+                  <DollarSign size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">
+                    Record Room Payment
+                  </h3>
+                  <p className="text-xs text-blue-200">
+                    Room #{selectedPaymentRoom.room_number} • {selectedPaymentRoom.type_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setPaymentModalOpen(false);
+                  setSelectedPaymentRoom(null);
+                }}
+                className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmPayment}>
+              <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                {/* Guest and Stay Breakdown */}
+                {(() => {
+                  const alert = getRoomPaymentAlert(selectedPaymentRoom);
+                  const totalAmt = Number(selectedPaymentRoom.total_amount || 0);
+                  const paidAmt = Number(selectedPaymentRoom.paid_amount || 0);
+                  const balance = Math.max(0, totalAmt - paidAmt);
+                  const totalNights = Math.max(1, Number(selectedPaymentRoom.total_nights || 1));
+                  let nightlyRate = Number(selectedPaymentRoom.rate_per_night || selectedPaymentRoom.base_rate || 0);
+                  if (nightlyRate <= 0 && totalNights > 0 && totalAmt > 0) {
+                    nightlyRate = totalAmt / totalNights;
+                  }
+                  const paidNights = alert?.paidNights ?? (nightlyRate > 0 ? Math.floor(paidAmt / nightlyRate) : 0);
+                  const unpaidNights = alert?.unpaidNights ?? Math.max(0, totalNights - paidNights);
+
+                  return (
+                    <>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{selectedPaymentRoom.guest_name || "Guest"}</p>
+                            <p className="text-xs text-slate-500">{selectedPaymentRoom.guest_phone || "No phone recorded"}</p>
+                          </div>
+                          <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-800">
+                            Stay: {totalNights} Night(s)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5 pt-2.5 border-t border-slate-200/60 text-xs">
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase font-bold block">Nightly Rate</span>
+                            <span className="font-mono font-bold text-slate-800">{nightlyRate.toLocaleString()} ETB</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Accommodation</span>
+                            <span className="font-mono font-bold text-slate-900">{totalAmt.toLocaleString()} ETB</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase font-bold block">Paid So Far</span>
+                            <span className="font-mono font-bold text-emerald-700">
+                              {paidAmt.toLocaleString()} ETB ({paidNights}n covered)
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] uppercase font-bold block">Remaining Due</span>
+                            <span className="font-mono font-black text-rose-600">
+                              {balance.toLocaleString()} ETB ({unpaidNights}n unpaid)
+                            </span>
+                          </div>
+                        </div>
+
+                        {alert?.paidThroughStr && (
+                          <div className={`mt-2 rounded-lg p-2.5 text-xs border ${
+                            alert.severity === "expired"
+                              ? "bg-rose-50 border-rose-200 text-rose-900"
+                              : alert.severity === "due_today"
+                              ? "bg-rose-50 border-rose-200 text-rose-900"
+                              : "bg-blue-50 border-blue-200 text-blue-900"
+                          }`}>
+                            <p className="font-bold flex items-center gap-1.5">
+                              <AlertCircle size={14} className={alert.severity === "expired" ? "text-rose-600" : "text-blue-600"} />
+                              {alert.severity === "expired" ? "Coverage Expired!" : "Coverage Schedule"}
+                            </p>
+                            <p className="text-[11px] mt-0.5">
+                              Current payments cover stay through <strong>{alert.paidThroughStr}</strong> ({paidNights} nights).
+                              {unpaidNights > 0 && ` Settle remaining ${unpaidNights} nights (${balance.toLocaleString()} ETB) to complete booking.`}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Amount to Pay */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Payment Amount to Collect (ETB) *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            min="1"
+                            required
+                            placeholder="Enter amount in ETB..."
+                            value={paymentForm.amount}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                            className="w-full rounded-xl border border-slate-300 p-2.5 text-sm font-bold font-mono outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                          />
+                        </div>
+
+                        {/* Quick Select Buttons */}
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {balance > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentForm({ ...paymentForm, amount: String(balance) })}
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 transition"
+                            >
+                              Full Balance ({balance.toLocaleString()} ETB)
+                            </button>
+                          )}
+                          {nightlyRate > 0 && balance >= nightlyRate && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentForm({ ...paymentForm, amount: String(nightlyRate) })}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            >
+                              +1 Night ({nightlyRate.toLocaleString()} ETB)
+                            </button>
+                          )}
+                          {nightlyRate > 0 && balance >= nightlyRate * 5 && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentForm({ ...paymentForm, amount: String(nightlyRate * 5) })}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            >
+                              +5 Nights ({(nightlyRate * 5).toLocaleString()} ETB)
+                            </button>
+                          )}
+                          {nightlyRate > 0 && balance >= nightlyRate * 10 && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentForm({ ...paymentForm, amount: String(nightlyRate * 10) })}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition"
+                            >
+                              +10 Nights ({(nightlyRate * 10).toLocaleString()} ETB)
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Payment Method */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Payment Method *
+                        </label>
+                        <select
+                          value={paymentForm.payment_method}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white"
+                        >
+                          <option value="cash">Cash</option>
+                          <option value="cbe">Commercial Bank of Ethiopia (CBE)</option>
+                          <option value="telebirr">Telebirr</option>
+                          <option value="awash">Awash Bank</option>
+                          <option value="abyssinia">Bank of Abyssinia (BoA)</option>
+                          <option value="card">Credit / Debit Card</option>
+                          <option value="other">Other Bank Transfer</option>
+                        </select>
+                      </div>
+
+                      {/* Transaction Reference */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Transaction Reference / Slip # (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. TXN-938210 or CBE Slip No."
+                          value={paymentForm.transaction_reference}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, transaction_reference: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 p-2.5 text-xs outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+
+                      {/* Notes */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Notes / Remarks (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Paid for remaining 10 nights"
+                          value={paymentForm.notes}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 p-2.5 text-xs outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 p-4 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentModalOpen(false);
+                    setSelectedPaymentRoom(null);
+                  }}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingPayment}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition disabled:opacity-50"
+                >
+                  {submittingPayment ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Confirm Payment
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

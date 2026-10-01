@@ -457,7 +457,41 @@ export default function ReservationsListPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {reservations.map((r) => {
-              const balance = Number(r.total_amount) - Number(r.paid_amount);
+              const totalAmt = Number(r.total_amount || 0);
+              const paidAmt = Number(r.paid_amount || 0);
+              const balance = Math.max(0, totalAmt - paidAmt);
+              const totalNights = Math.max(1, Number(r.total_nights || 1));
+              let nightlyRate = Number(r.rate_per_night || 0);
+              if (nightlyRate <= 0 && totalNights > 0 && totalAmt > 0) {
+                nightlyRate = totalAmt / totalNights;
+              }
+              const paidNights = nightlyRate > 0 ? Math.floor(paidAmt / nightlyRate) : 0;
+              const unpaidNights = Math.max(0, totalNights - paidNights);
+
+              let paidThroughStr = null;
+              let isExpired = false;
+              let isDueToday = false;
+              let isDueTomorrow = false;
+
+              if (r.check_in_date && balance > 0) {
+                const checkInRaw = String(r.check_in_date).split("T")[0];
+                const parts = checkInRaw.split("-").map(Number);
+                if (parts.length === 3 && !parts.some(isNaN)) {
+                  const [y, m, d] = parts;
+                  const checkInDate = new Date(Date.UTC(y, m - 1, d));
+                  const ptDate = new Date(checkInDate.getTime() + paidNights * 86400000);
+                  paidThroughStr = ptDate.toISOString().split("T")[0];
+
+                  const now = new Date();
+                  const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+                  const diff = Math.round((ptDate.getTime() - todayUTC.getTime()) / 86400000);
+
+                  if (diff < 0 && r.status !== 'cancelled' && r.status !== 'checked_out') isExpired = true;
+                  if (diff === 0 && r.status !== 'cancelled' && r.status !== 'checked_out') isDueToday = true;
+                  if (diff === 1 && r.status !== 'cancelled' && r.status !== 'checked_out') isDueTomorrow = true;
+                }
+              }
+
               return (
                 <tr key={r.id} className="hover:bg-slate-50/80 transition">
                   <td className="px-6 py-4 font-mono font-bold text-blue-600">
@@ -556,12 +590,46 @@ export default function ReservationsListPage() {
                   <td className="px-6 py-4 text-xs">
                     <p className="text-slate-800 font-medium">In: {r.check_in_date?.split("T")[0]}</p>
                     <p className="text-slate-500">Out: {r.check_out_date?.split("T")[0]}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{totalNights} Night(s)</p>
                   </td>
                   <td className="px-6 py-4 text-xs">
-                    <p className="font-bold text-slate-900">${Number(r.total_amount).toFixed(2)}</p>
-                    <p className={balance <= 0 ? "text-emerald-600" : "text-rose-500"}>
-                      {balance <= 0 ? "Fully Paid" : `Due: $${balance.toFixed(2)}`}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-bold text-slate-900">{totalAmt.toLocaleString()} ETB</p>
+                      {balance <= 0 ? (
+                        <span className="rounded bg-emerald-50 px-1.5 py-0.2 text-[10px] font-bold text-emerald-700">
+                          Paid
+                        </span>
+                      ) : isExpired ? (
+                        <span className="rounded bg-rose-100 text-rose-800 px-1.5 py-0.2 text-[9px] font-extrabold animate-pulse">
+                          Expired
+                        </span>
+                      ) : isDueToday ? (
+                        <span className="rounded bg-rose-100 text-rose-800 px-1.5 py-0.2 text-[9px] font-extrabold">
+                          Due Today
+                        </span>
+                      ) : isDueTomorrow ? (
+                        <span className="rounded bg-amber-100 text-amber-900 px-1.5 py-0.2 text-[9px] font-extrabold">
+                          Due Tomorrow
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {balance > 0 ? (
+                      <div className="mt-0.5 space-y-0.5">
+                        <p className="text-rose-600 font-bold font-mono">
+                          Due: {balance.toLocaleString()} ETB ({unpaidNights}n unpaid)
+                        </p>
+                        {paidThroughStr && (
+                          <p className="text-[10px] text-slate-500">
+                            Covered to: <strong className="text-slate-700">{paidThroughStr}</strong> ({paidNights}n)
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-emerald-600 text-[11px] font-medium mt-0.5">
+                        Fully Covered
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span
@@ -592,7 +660,7 @@ export default function ReservationsListPage() {
                         </button>
                       )}
 
-                      {r.status === "checked_in" && balance > 0 && (
+                      {(r.status === "checked_in" || r.status === "confirmed") && balance > 0 && (
                         <button
                           onClick={() => handleOpenPayment(r)}
                           className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition"
