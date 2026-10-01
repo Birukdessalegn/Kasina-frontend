@@ -799,7 +799,7 @@ export default function DashboardPage() {
           ITEMIZED REVENUE LEADERBOARD (FOOD & DRINKS BREAKDOWN)
       ====================================================== */}
 
-      <ItemizedRevenueSection dashboard={dashboard} formatMoney={formatMoney} />
+      <ItemizedRevenueSection dashboard={dashboard} formatMoney={formatMoney} reservations={reservations} />
       {/* ============================================================
           PAYMENT / TRANSFER ACCOUNTS MODAL
       ============================================================ */}
@@ -817,15 +817,18 @@ export default function DashboardPage() {
 // ITEMIZED REVENUE LEADERBOARD COMPONENT
 // ============================================================
 
-function ItemizedRevenueSection({ dashboard, formatMoney }) {
-  const [categoryFilter, setCategoryFilter] = useState("all"); // "all" | "food" | "bar"
+function ItemizedRevenueSection({ dashboard, formatMoney, reservations = [] }) {
+  const [categoryFilter, setCategoryFilter] = useState("all"); // "all" | "rooms" | "food" | "bar"
 
-  // Process live database top products strictly from registered products & orders
+  // Process live database top products (Food/Drinks) & Room Reservations
   const rawProducts = useMemo(() => {
+    const items = [];
+
+    // 1. Process food and bar products from orders
     if (dashboard?.top_products && Array.isArray(dashboard.top_products) && dashboard.top_products.length > 0) {
-      return dashboard.top_products
+      dashboard.top_products
         .filter((p) => Number(p.quantity_sold || p.quantity || 0) > 0)
-        .map((p) => {
+        .forEach((p) => {
           const qty = Number(p.quantity_sold || p.quantity || 0);
           const unitPrice = Number(p.price || p.unit_price || p.cost_price || 0);
           const rev = Number(p.revenue || p.total_revenue || 0);
@@ -833,26 +836,75 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
           // Total money obtained by serving this item (quantity * unitPrice or total revenue)
           const finalRevenue = rev > 0 ? rev : (qty * unitPrice);
 
-          return {
-            id: p.id,
+          items.push({
+            id: `prod-${p.id || p.name}`,
             name: p.name,
             category: p.category_name || (p.category_type === "bar" ? "Bar & Drinks" : "Kitchen Food"),
             categoryType: p.category_type || "food",
             quantity: qty,
             unitPrice: unitPrice,
             revenue: finalRevenue,
-          };
+          });
         });
     }
 
-    // Strict real data mode: Return empty array when no orders have been placed yet
-    return [];
-  }, [dashboard]);
+    // 2. Process room reservations grouped by Room Type
+    if (Array.isArray(reservations) && reservations.length > 0) {
+      const roomTypeMap = new Map();
+
+      reservations.forEach((res) => {
+        // Exclude cancelled bookings
+        if (res.status === "cancelled") return;
+
+        const typeName = res.room_type_name || (res.room_number ? `Room ${res.room_number}` : "Room Lodging");
+        const nights = Math.max(1, Number(res.total_nights || 1));
+        const rev = Number(res.paid_amount > 0 ? res.paid_amount : (res.total_amount || 0));
+        const roomNum = res.room_number ? String(res.room_number) : null;
+
+        if (!roomTypeMap.has(typeName)) {
+          roomTypeMap.set(typeName, {
+            id: `room-type-${typeName.toLowerCase().replace(/\s+/g, "-")}`,
+            name: typeName,
+            category: "Rooms & Lodging",
+            categoryType: "rooms",
+            quantity: 0, // nights booked
+            staysCount: 0,
+            revenue: 0,
+            roomNumbers: new Set(),
+          });
+        }
+
+        const entry = roomTypeMap.get(typeName);
+        entry.quantity += nights;
+        entry.staysCount += 1;
+        entry.revenue += rev;
+        if (roomNum) entry.roomNumbers.add(roomNum);
+      });
+
+      roomTypeMap.forEach((entry) => {
+        if (entry.revenue > 0 || entry.quantity > 0) {
+          const roomList = Array.from(entry.roomNumbers).sort();
+          items.push({
+            ...entry,
+            roomsSummary: roomList.length > 0 
+              ? `${roomList.length === 1 ? "Room " : "Rooms "}${roomList.join(", ")}`
+              : null,
+          });
+        }
+      });
+    }
+
+    // Sort descending by revenue earned
+    items.sort((a, b) => b.revenue - a.revenue);
+
+    return items;
+  }, [dashboard, reservations]);
 
   // Filter products by selected category
   const filteredProducts = useMemo(() => {
     return rawProducts.filter((item) => {
       if (categoryFilter === "all") return true;
+      if (categoryFilter === "rooms") return item.categoryType === "rooms";
       if (categoryFilter === "food") return item.categoryType === "food" || item.category.toLowerCase().includes("food") || item.category.toLowerCase().includes("kitchen");
       if (categoryFilter === "bar") return item.categoryType === "bar" || item.category.toLowerCase().includes("bar") || item.category.toLowerCase().includes("cocktail");
       return true;
@@ -879,16 +931,16 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
               Itemized Product Revenue Leaderboard
             </h2>
             <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-extrabold text-emerald-800">
-              {totalCategoryItemsServed.toLocaleString()} Total Items Served
+              {totalCategoryItemsServed.toLocaleString()} Total {categoryFilter === "rooms" ? "Nights Booked" : "Units Served"}
             </span>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Individual sales revenue generated by food, drinks, and services in your hotel.
+            Individual sales revenue generated by room lodging, food, and drinks in your hotel.
           </p>
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+        <div className="flex flex-wrap items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold gap-0.5">
           <button
             type="button"
             onClick={() => setCategoryFilter("all")}
@@ -902,8 +954,20 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
 
           <button
             type="button"
+            onClick={() => setCategoryFilter("rooms")}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${categoryFilter === "rooms"
+                ? "bg-white text-indigo-700 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+              }`}
+          >
+            <BedDouble className="h-3.5 w-3.5" />
+            Rooms & Lodging
+          </button>
+
+          <button
+            type="button"
             onClick={() => setCategoryFilter("food")}
-            className={`flex items-center gap-1 rounded-lg px-3.5 py-1.5 transition ${categoryFilter === "food"
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${categoryFilter === "food"
                 ? "bg-white text-emerald-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
               }`}
@@ -915,8 +979,8 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
           <button
             type="button"
             onClick={() => setCategoryFilter("bar")}
-            className={`flex items-center gap-1 rounded-lg px-3.5 py-1.5 transition ${categoryFilter === "bar"
-                ? "bg-white text-emerald-700 shadow-sm"
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${categoryFilter === "bar"
+                ? "bg-white text-amber-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
               }`}
           >
@@ -929,10 +993,18 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
       {/* Item List / Leaderboard */}
       {filteredProducts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Utensils className="mb-2 h-10 w-10 text-slate-300" />
-          <p className="text-sm font-bold text-slate-700">No Itemized Sales Recorded Yet</p>
+          {categoryFilter === "rooms" ? (
+            <BedDouble className="mb-2 h-10 w-10 text-slate-300" />
+          ) : (
+            <Utensils className="mb-2 h-10 w-10 text-slate-300" />
+          )}
+          <p className="text-sm font-bold text-slate-700">
+            {categoryFilter === "rooms" ? "No Room Reservations Recorded Yet" : "No Itemized Sales Recorded Yet"}
+          </p>
           <p className="mt-1 max-w-sm text-xs text-slate-400">
-            When orders are created and paid at the POS or Bar, individual item sales (e.g., Burgers, Beer, Cocktails) will populate here live directly from your database!
+            {categoryFilter === "rooms"
+              ? "When guests reserve and stay in rooms, their nights booked and lodging revenue will populate here live directly from your database!"
+              : "When orders are created and paid at the POS, Bar, or Front Desk, individual sales will populate here live directly from your database!"}
           </p>
         </div>
       ) : (
@@ -965,26 +1037,34 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
                       <p className="font-bold text-slate-900 text-base truncate">
                         {item.name}
                       </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          item.categoryType === "rooms"
+                            ? "bg-indigo-50 text-indigo-700 border border-indigo-200/60"
+                            : item.categoryType === "bar"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200/60"
+                            : "bg-slate-100 text-slate-600"
+                        }`}>
                           {item.category}
                         </span>
-                        <span className="text-xs text-slate-400">
-                          {item.quantity.toLocaleString()} units served
+                        <span className="text-xs text-slate-500 font-medium">
+                          {item.categoryType === "rooms"
+                            ? `${item.quantity.toLocaleString()} nights booked (${item.staysCount} ${item.staysCount === 1 ? "stay" : "stays"}${item.roomsSummary ? ` • ${item.roomsSummary}` : ""})`
+                            : `${item.quantity.toLocaleString()} units served`}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Individual Item Revenue (Total Money Obtained by Serving) */}
+                  {/* Individual Item Revenue */}
                   <div className="shrink-0 text-right">
-                    <p className="text-lg font-extrabold text-emerald-700">
+                    <p className={`text-lg font-extrabold ${item.categoryType === "rooms" ? "text-indigo-700" : "text-emerald-700"}`}>
                       {formatMoney(item.revenue)}
                     </p>
                     <span className="text-[11px] font-medium text-slate-400">
                       {item.quantity > 0 && sharePercent > 0
                         ? `${sharePercent}% of top item`
-                        : "Total Item Revenue"}
+                        : "Total Revenue"}
                     </span>
                   </div>
                 </div>
@@ -993,10 +1073,13 @@ function ItemizedRevenueSection({ dashboard, formatMoney }) {
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     style={{ width: `${sharePercent}%` }}
-                    className={`h-full rounded-full transition-all duration-500 ${index === 0
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      item.categoryType === "rooms"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600"
+                        : index === 0
                         ? "bg-gradient-to-r from-emerald-500 to-teal-600"
                         : "bg-gradient-to-r from-blue-500 to-indigo-600"
-                      }`}
+                    }`}
                   />
                 </div>
               </div>
