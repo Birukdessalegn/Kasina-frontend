@@ -65,6 +65,7 @@ import FrontDeskReportsPage from "../modules/frontdesk/pages/FrontDeskReportsPag
 import RecipesPage from "../modules/kitchen/pages/RecipesPage";
 import HousekeepingPage from "../modules/housekeeping/pages/HousekeepingPage";
 import PayrollPage from "../modules/employees/pages/PayrollPage";
+import SupervisorHubPage from "../modules/supervisor/pages/SupervisorHubPage";
 
 
 function AppRoutes() {
@@ -126,6 +127,25 @@ function AppRoutes() {
               <Route
                 path="/dashboard"
                 element={<DashboardPage />}
+              />
+            </Route>
+
+            {/* -------------------------
+                SUPERVISOR OPERATIONS HUB
+            -------------------------- */}
+
+            <Route
+              element={
+                <PermissionRoute permission="supervisor" />
+              }
+            >
+              <Route
+                path="/supervisor"
+                element={<SupervisorHubPage />}
+              />
+              <Route
+                path="/operations/supervisor"
+                element={<SupervisorHubPage />}
               />
             </Route>
 

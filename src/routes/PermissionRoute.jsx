@@ -24,6 +24,7 @@ const rolePermissions = {
     "finance",
     "employees",
     "barista",
+    "supervisor",
   ],
 
   COOPERATIVE_MANAGER: [
@@ -39,6 +40,7 @@ const rolePermissions = {
     "finance",
     "reports",
     "barista",
+    "supervisor",
   ],
 
   ACCOUNTANT_MANAGER: [
@@ -52,11 +54,11 @@ const rolePermissions = {
   ],
 
   KITCHEN_MANAGER: ["kitchen", "kitchen_audit", "inventory", "products"],
-  FNB_MANAGER: ["kitchen", "kitchen_audit", "inventory", "products", "reports", "bar", "barista"],
+  FNB_MANAGER: ["kitchen", "kitchen_audit", "inventory", "products", "reports", "bar", "barista", "supervisor"],
   FB_CONTROLLER: ["kitchen", "kitchen_audit", "inventory", "reports"],
 
-  CAFE_SUPERVISOR: ["pos", "orders", "kitchen", "finance", "barista"],
-  BAR_RESTAURANT_SUPERVISOR: ["pos", "orders", "bar", "kitchen", "finance", "barista"],
+  CAFE_SUPERVISOR: ["pos", "orders", "kitchen", "finance", "barista", "supervisor"],
+  BAR_RESTAURANT_SUPERVISOR: ["pos", "orders", "bar", "kitchen", "finance", "barista", "supervisor"],
 
   STORE_MANAGER: ["inventory", "products"],
   STOREKEEPER: ["inventory", "products"],

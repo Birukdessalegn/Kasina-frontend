@@ -62,6 +62,7 @@ export const ROLE_PERMISSIONS = {
     "cashier.reconcile",
     "employees.view",
     "payroll.view",
+    "supervisor.view",
   ],
 
   [ROLES.COOPERATIVE_MANAGER]: [
@@ -84,6 +85,7 @@ export const ROLE_PERMISSIONS = {
     "finance.view",
     "reports.view",
     "attendance.view",
+    "supervisor.view",
   ],
 
   [ROLES.ACCOUNTANT_MANAGER]: [
@@ -114,6 +116,7 @@ export const ROLE_PERMISSIONS = {
     "inventory.view",
     "products.view",
     "reports.view",
+    "supervisor.view",
   ],
 
   [ROLES.FB_CONTROLLER]: [
@@ -137,6 +140,7 @@ export const ROLE_PERMISSIONS = {
     "cashier.reconcile",
     "attendance.view",
     "reports.view",
+    "supervisor.view",
   ],
 
   [ROLES.BAR_RESTAURANT_SUPERVISOR]: [
@@ -152,6 +156,7 @@ export const ROLE_PERMISSIONS = {
     "cashier.reconcile",
     "attendance.view",
     "reports.view",
+    "supervisor.view",
   ],
 
   [ROLES.STORE_MANAGER]: [

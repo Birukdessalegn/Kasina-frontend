@@ -50,6 +50,7 @@ import {
   Sparkles,
   DollarSign,
   Coffee,
+  ShieldCheck,
 } from "lucide-react";
 
 /* =========================================================
@@ -74,6 +75,12 @@ const navigationGroups = [
     title: "Operations",
 
     items: [
+      {
+        name: "Supervisor Hub",
+        path: "/supervisor",
+        icon: ShieldCheck,
+        permission: "supervisor.view",
+      },
       {
         name: "Front Desk",
         icon: BedDouble,
