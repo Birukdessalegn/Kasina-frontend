@@ -608,6 +608,11 @@ function EmployeesPage() {
           setError("Password is required.");
           return;
         }
+
+        if (editingEmployee && !editingEmployee.user_id && form.username.trim() && !form.password.trim()) {
+          setError("A password is required to generate a new login account for this employee.");
+          return;
+        }
       }
 
       const currentRoles = rolesList.length > 0 ? rolesList : roles;
@@ -1631,9 +1636,9 @@ function EmployeesPage() {
                           value={form.password}
                           onChange={handleFormChange}
                           placeholder={
-                            editingEmployee
+                            editingEmployee && editingEmployee.user_id
                               ? "Leave blank to keep current password"
-                              : "Enter password"
+                              : "Enter new password"
                           }
                           className="w-full rounded-lg border border-gray-200 pl-3 pr-10 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                         />
@@ -1647,11 +1652,15 @@ function EmployeesPage() {
                         </button>
                       </div>
 
-                      {editingEmployee && (
+                      {editingEmployee && editingEmployee.user_id ? (
                         <p className="mt-1 text-xs text-gray-400">
                           Only enter a password if you want to change it.
                         </p>
-                      )}
+                      ) : editingEmployee && !editingEmployee.user_id ? (
+                        <p className="mt-1 text-xs text-blue-600 font-medium">
+                          💡 Enter a username and password to generate a new login account.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
