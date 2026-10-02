@@ -327,6 +327,8 @@ function EmployeesPage() {
     message: "",
   });
 
+  const [confirmAction, setConfirmAction] = useState(null);
+
   const showToast = (type, message) => {
     setToast({
       show: true,
@@ -712,175 +714,125 @@ function EmployeesPage() {
   };
 
   
-  const handleDeleteLoginAccount = async (employee) => {
+  const requestDeleteLoginAccount = (employee) => {
     const employeeName =
       employee.name ||
       `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
 
-    const confirmed = window.confirm(
-      `Are you sure you want to remove the login account for ${employeeName}?\n\nThis will permanently delete their username/password login credentials, while preserving all of their sales, payments, attendance, and work history.`
-    );
+    setConfirmAction({
+      type: "delete_login",
+      employee,
+      title: "Remove Login Account",
+      message: `Are you sure you want to remove the login credentials for ${employeeName}? This will permanently delete their username and password while safely preserving all past sales, orders, attendance, and work history.`,
+      confirmText: "Remove Login",
+      confirmColor: "amber",
+    });
+  };
 
-    if (!confirmed) return;
+  const requestDeactivateEmployee = (employee) => {
+    const employeeName =
+      employee.name ||
+      `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
+
+    setConfirmAction({
+      type: "deactivate",
+      employee,
+      title: "Deactivate Employee",
+      message: `Are you sure you want to deactivate ${employeeName}? Their login access will be disabled and they will be marked as inactive. All history will be preserved.`,
+      confirmText: "Yes, Deactivate",
+      confirmColor: "red",
+    });
+  };
+
+  const requestActivateEmployee = (employee) => {
+    const employeeName =
+      employee.name ||
+      `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
+
+    setConfirmAction({
+      type: "activate",
+      employee,
+      title: "Activate Employee",
+      message: `Are you sure you want to reactivate ${employeeName}? They will be marked as active and their linked login account will be unlocked for duty.`,
+      confirmText: "Yes, Activate",
+      confirmColor: "green",
+    });
+  };
+
+  const executeConfirmedAction = async () => {
+    if (!confirmAction || !confirmAction.employee) return;
+    const { type, employee } = confirmAction;
+    const employeeName =
+      employee.name ||
+      `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
 
     try {
       setDeleting(true);
       setError("");
 
-      await api(`/employees/${employee.id}/login-account`, {
-        method: "DELETE",
-      });
+      if (type === "deactivate") {
+        await api(`/employees/${employee.id}`, {
+          method: "DELETE",
+        });
 
-      setEmployeeList((previous) =>
-        previous.map((item) =>
-          item.id === employee.id
-            ? {
-                ...item,
-                user_id: null,
-                username: null,
-              }
-            : item
-        )
-      );
+        setEmployeeList((previous) =>
+          previous.map((item) =>
+            Number(item.id) === Number(employee.id)
+              ? { ...item, status: "inactive", attendance: "Absent" }
+              : item
+          )
+        );
+        setSelectedEmployee((prev) =>
+          prev && Number(prev.id) === Number(employee.id)
+            ? { ...prev, status: "inactive", attendance: "Absent" }
+            : prev
+        );
+        showToast("success", `${employeeName} has been deactivated.`);
+      } else if (type === "activate") {
+        await api(`/employees/${employee.id}/activate`, {
+          method: "PUT",
+        });
 
-      if (selectedEmployee?.id === employee.id) {
-        setSelectedEmployee((prev) => ({
-          ...prev,
-          user_id: null,
-          username: null,
-        }));
+        setEmployeeList((previous) =>
+          previous.map((item) =>
+            Number(item.id) === Number(employee.id)
+              ? { ...item, status: "active", attendance: "Present", user_status: "active" }
+              : item
+          )
+        );
+        setSelectedEmployee((prev) =>
+          prev && Number(prev.id) === Number(employee.id)
+            ? { ...prev, status: "active", attendance: "Present", user_status: "active" }
+            : prev
+        );
+        showToast("success", `${employeeName} has been activated.`);
+      } else if (type === "delete_login") {
+        await api(`/employees/${employee.id}/login-account`, {
+          method: "DELETE",
+        });
+
+        setEmployeeList((previous) =>
+          previous.map((item) =>
+            Number(item.id) === Number(employee.id)
+              ? { ...item, user_id: null, username: null }
+              : item
+          )
+        );
+        setSelectedEmployee((prev) =>
+          prev && Number(prev.id) === Number(employee.id)
+            ? { ...prev, user_id: null, username: null }
+            : prev
+        );
+        showToast("success", `Login account removed for ${employeeName}. Work history preserved.`);
       }
 
-      showToast(
-        "success",
-        `Login account removed for ${employeeName}. Work history preserved.`
-      );
-    } catch (error) {
-      console.error("Failed to remove login account:", error);
-      showToast(
-        "error",
-        error.message || "Failed to remove login account"
-      );
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleDeleteEmployee = async (employee) => {
-    const employeeName =
-      employee.name ||
-      `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
-
-    const confirmed = window.confirm(
-      `Are you sure you want to deactivate ${employeeName}?`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setDeleting(true);
-      setError("");
-
-      await api(`/employees/${employee.id}`, {
-        method: "DELETE",
-      });
-
-      setEmployeeList((previous) =>
-        previous.map((item) =>
-          item.id === employee.id
-            ? {
-                ...item,
-                status: "inactive",
-                attendance: "Absent",
-              }
-            : item
-        )
-      );
-
-      setSelectedEmployee(null);
-
-      showToast(
-        "success",
-        `${employeeName} has been deactivated.`
-      );
-    } catch (error) {
-      console.error(
-        "Failed to deactivate employee:",
-        error
-      );
-
-      showToast(
-        "error",
-        error.message ||
-          "Failed to deactivate employee"
-      );
-
-      setError("");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleActivateEmployee = async (employee) => {
-    const employeeName =
-      employee.name ||
-      `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
-
-    const confirmed = window.confirm(
-      `Are you sure you want to activate ${employeeName}?`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setError("");
-      setDeleting(true);
-
-      await api(`/employees/${employee.id}/activate`, {
-        method: "PUT",
-      });
-
-      setEmployeeList((previous) =>
-        previous.map((item) =>
-          item.id === employee.id
-            ? {
-                ...item,
-                status: "active",
-                attendance: "Present",
-                user_status: "active",
-              }
-            : item
-        )
-      );
-
-      setSelectedEmployee((previous) =>
-        previous?.id === employee.id
-          ? {
-              ...previous,
-              status: "active",
-              attendance: "Present",
-              user_status: "active",
-            }
-          : previous
-      );
-
-      showToast(
-        "success",
-        `${employeeName} has been activated.`
-      );
-    } catch (error) {
-      console.error(
-        "Failed to activate employee:",
-        error
-      );
-
-      showToast(
-        "error",
-        error.message ||
-          "Failed to activate employee"
-      );
-
-      setError("");
+      setConfirmAction(null);
+      // Auto re-fetch to ensure complete sync with database
+      await fetchEmployees();
+    } catch (err) {
+      console.error(`Failed to ${type} employee:`, err);
+      showToast("error", err.message || `Failed to ${type} employee`);
+      setError(err.message || `Failed to ${type} employee`);
     } finally {
       setDeleting(false);
     }
@@ -1266,7 +1218,7 @@ function EmployeesPage() {
                             {/* Remove Login Account Only (preserves sales/work history) */}
                             {employee.user_id && (
                               <button
-                                onClick={() => handleDeleteLoginAccount(employee)}
+                                onClick={() => requestDeleteLoginAccount(employee)}
                                 disabled={deleting}
                                 className="rounded-lg p-2 text-gray-500 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-50"
                                 title="Remove Login Account (Keeps History)"
@@ -1284,7 +1236,7 @@ function EmployeesPage() {
 
                             {String(employee.status).toLowerCase() === "inactive" ? (
                               <button
-                                onClick={() => handleActivateEmployee(employee)}
+                                onClick={() => requestActivateEmployee(employee)}
                                 disabled={deleting}
                                 className="rounded-lg p-2 text-gray-500 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
                                 title="Activate employee"
@@ -1293,7 +1245,7 @@ function EmployeesPage() {
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleDeleteEmployee(employee)}
+                                onClick={() => requestDeactivateEmployee(employee)}
                                 disabled={deleting}
                                 className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                                 title="Deactivate employee"
@@ -2118,6 +2070,69 @@ function EmployeesPage() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          CONFIRMATION MODAL (DEACTIVATE / ACTIVATE / REMOVE LOGIN)
+      ====================================================== */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 transform transition-all scale-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                  confirmAction.confirmColor === "red"
+                    ? "bg-red-100 text-red-600"
+                    : confirmAction.confirmColor === "green"
+                    ? "bg-green-100 text-green-600"
+                    : "bg-amber-100 text-amber-600"
+                }`}
+              >
+                {confirmAction.confirmColor === "red" ? (
+                  <Trash2 className="w-6 h-6" />
+                ) : confirmAction.confirmColor === "green" ? (
+                  <UserCheck className="w-6 h-6" />
+                ) : (
+                  <KeyRound className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{confirmAction.title}</h3>
+                <p className="text-xs text-gray-500">Please confirm this action</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 leading-relaxed mb-6">
+              {confirmAction.message}
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmAction(null)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={executeConfirmedAction}
+                className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-md flex items-center gap-2 transition-all disabled:opacity-50 ${
+                  confirmAction.confirmColor === "red"
+                    ? "bg-red-600 hover:bg-red-700 shadow-red-500/20"
+                    : confirmAction.confirmColor === "green"
+                    ? "bg-green-600 hover:bg-green-700 shadow-green-500/20"
+                    : "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
+                }`}
+              >
+                {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{confirmAction.confirmText}</span>
+              </button>
             </div>
           </div>
         </div>
