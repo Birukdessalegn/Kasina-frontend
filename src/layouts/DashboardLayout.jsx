@@ -794,7 +794,8 @@ function DashboardLayout() {
                   if (
                     child.path?.startsWith("/finance") ||
                     child.path === "/pos/tables" ||
-                    child.path === "/tables"
+                    child.path === "/tables" ||
+                    child.path === "/pos"
                   ) {
                     return false;
                   }

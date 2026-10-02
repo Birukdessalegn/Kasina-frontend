@@ -63,9 +63,17 @@ function POSLayout() {
     user?.role_id === 6 ||
     userPosition.includes("waiter");
 
+  const isCashier =
+    userRoleUpper.includes("CASHIER") ||
+    user?.role_id === 5 ||
+    userPosition.includes("cashier");
+
   const visibleMenuItems = menuItems.filter((item) => {
     if (isWaiter) {
       return item.path === "/pos" || item.path === "/pos/served-orders";
+    }
+    if (isCashier) {
+      return item.path === "/pos/served-orders" || item.path === "/pos/sales-audit" || item.path === "/pos/reports";
     }
     return true;
   });

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Navigate } from "react-router-dom";
 import { useRestaurant } from "../../../context/RestaurantContext";
 import { useAuth } from "../../../context/AuthContext";
 import TableSelector from "../components/TableSelector";
@@ -429,6 +430,10 @@ function POSPage() {
   const handleClear = () => {
     setOrderItems([]);
   };
+
+  if (isCashier && !isManagerOrAdmin) {
+    return <Navigate to="/pos/sales-audit" replace />;
+  }
 
   return (
     <div className="space-y-6">

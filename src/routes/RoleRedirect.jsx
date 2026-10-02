@@ -28,8 +28,10 @@ function RoleRedirect() {
 
     case "WAITER":
     case "CAFE_WAITER":
-    case "CASHIER":
       return <Navigate to="/pos" replace />;
+
+    case "CASHIER":
+      return <Navigate to="/pos/sales-audit" replace />;
 
     case "CAFE_SUPERVISOR":
     case "BAR_RESTAURANT_SUPERVISOR":

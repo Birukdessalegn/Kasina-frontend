@@ -37,17 +37,18 @@ function WaiterServedOrdersPage() {
   const [dateRangeFilter, setDateRangeFilter] = useState("today"); // "today" | "week" | "month" | "custom"
   const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split("T")[0]);
-  const [waiterScope, setWaiterScope] = useState("mine"); // "mine" | "all"
-  const [expandedOrderId, setExpandedOrderId] = useState(null);
-  const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
-  const [selectedProofOrder, setSelectedProofOrder] = useState(null);
-
   const userRole = (user?.role || "").toLowerCase();
+  const isCashier = userRole.includes("cashier") || user?.role_id === 5;
   const isManagerOrAdmin =
     ["admin", "manager", "cashier"].includes(userRole) ||
     user?.role_id === 1 ||
     user?.role_id === 2 ||
     user?.role_id === 4;
+
+  const [waiterScope, setWaiterScope] = useState(isCashier || isManagerOrAdmin ? "all" : "mine"); // "mine" | "all"
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
+  const [selectedProofOrder, setSelectedProofOrder] = useState(null);
   const userIdStr = String(user?.id || user?.user_id || user?.userId || "");
   const employeeIdStr = String(user?.employee_id || user?.employeeId || "");
   const userNameLower = (user?.username || user?.name || "").toLowerCase().trim();
@@ -588,19 +589,21 @@ function WaiterServedOrdersPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-900 md:text-2xl">
-                My Served Orders
+                {isCashier ? "Waiters' Served Orders Cross-Check" : "My Served Orders"}
               </h1>
               <p className="text-xs text-slate-500 font-medium">
-                {dateRangeFilter === "today" && "Today's delivered tickets for Waiter: "}
-                {dateRangeFilter === "week" && "This week's delivered tickets for Waiter: "}
-                {dateRangeFilter === "month" && "This month's delivered tickets for Waiter: "}
-                {dateRangeFilter === "custom" && `Delivered tickets (${customStartDate} to ${customEndDate}) for Waiter: `}
+                {isCashier
+                  ? "Live table orders delivered by all waiters (audit & payment cross-check): "
+                  : dateRangeFilter === "today" ? "Today's delivered tickets for Waiter: "
+                  : dateRangeFilter === "week" ? "This week's delivered tickets for Waiter: "
+                  : dateRangeFilter === "month" ? "This month's delivered tickets for Waiter: "
+                  : `Delivered tickets (${customStartDate} to ${customEndDate}) for Waiter: `}
                 <span className="text-blue-600 font-semibold">
                   {userFullName || user?.username || "Staff"}
                 </span>
                 {waiterScope === "all" && (
                   <span className="ml-1.5 rounded bg-purple-100 text-purple-800 text-[10px] font-extrabold px-1.5 py-0.5 uppercase tracking-wide">
-                    All Orders View
+                    All Waiters View
                   </span>
                 )}
               </p>
