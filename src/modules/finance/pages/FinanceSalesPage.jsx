@@ -123,6 +123,7 @@ function FinanceSalesPage() {
           const linkedOrder = rawOrders.find((o) => String(o.id) === String(p.order_id));
           if (p.order_id) linkedOrderIds.add(String(p.order_id));
 
+          const proofImg = p.receipt_image || p.receiptImage || p.image_url || p.imageUrl || linkedOrder?.receipt_image || linkedOrder?.receiptImage || linkedOrder?.image_url || linkedOrder?.imageUrl || null;
           records.push({
             id: `pos-pay-${p.id}`,
             rawId: p.id,
@@ -139,7 +140,12 @@ function FinanceSalesPage() {
             date: p.paid_at || p.created_at || (linkedOrder && (linkedOrder.created_at || linkedOrder.createdAt)),
             status: "paid",
             isSettled: true,
-            raw: p,
+            reference: p.reference || linkedOrder?.reference || "",
+            receipt_image: proofImg,
+            receiptImage: proofImg,
+            image_url: proofImg,
+            imageUrl: proofImg,
+            raw: { ...(linkedOrder || {}), ...p, receipt_image: proofImg, image_url: proofImg },
           });
         }
       });
@@ -759,20 +765,45 @@ function FinanceSalesPage() {
                         <p className="text-[10px] text-slate-400">Staff: {r.staff}</p>
                       </td>
                       <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${
-                            method === "card"
-                              ? "border-blue-200 bg-blue-50 text-blue-700"
-                              : method === "mobile_money" || method === "telebirr" || method === "cbe"
-                              ? "border-purple-200 bg-purple-50 text-purple-700"
-                              : method === "credit"
-                              ? "border-amber-200 bg-amber-50 text-amber-700"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          }`}
-                        >
-                          <CreditCard className="h-3 w-3" />
-                          {r.payment_method}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${
+                              method === "card"
+                                ? "border-blue-200 bg-blue-50 text-blue-700"
+                                : method === "mobile_money" || method === "telebirr" || method === "cbe"
+                                ? "border-purple-200 bg-purple-50 text-purple-700"
+                                : method === "credit"
+                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            }`}
+                          >
+                            <CreditCard className="h-3 w-3" />
+                            {r.payment_method}
+                          </span>
+
+                          {/* Transfer Proof Button */}
+                          {hasPaymentProof(r) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedProofOrder(r.raw || r);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 text-[10px] font-black text-indigo-700 shadow-2xs transition cursor-pointer"
+                              title="View Mobile Transfer Confirmation Slip / Screenshot"
+                            >
+                              <Eye className="h-3 w-3" />
+                              <span>View Proof</span>
+                            </button>
+                          )}
+
+                          {/* Reference Code */}
+                          {r.reference && r.reference !== "PAYMENT" && (
+                            <span className="text-[10px] font-mono text-slate-500 max-w-[130px] truncate" title={r.reference}>
+                              #{r.reference}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-right font-black text-slate-900 font-mono text-sm">
                         {Number(r.amount || 0).toLocaleString()} ETB
