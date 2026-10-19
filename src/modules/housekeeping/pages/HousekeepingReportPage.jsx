@@ -38,15 +38,15 @@ function HousekeepingReportPage() {
     try {
       setLoading(true);
       setError("");
-      const res = await api.get(`/api/housekeeping/report?date=${date || selectedDate}`);
-      if (res.data?.success) {
-        setReportData(res.data.data);
+      const res = await api(`/housekeeping/report?date=${date || selectedDate}`);
+      if (res?.success) {
+        setReportData(res.data);
       } else {
-        setError(res.data?.message || "Failed to load housekeeping report");
+        setError(res?.message || "Failed to load housekeeping report");
       }
     } catch (err) {
       console.error("Error fetching housekeeping report:", err);
-      setError(err.response?.data?.message || err.message || "Network error loading report");
+      setError(err.message || "Network error loading report");
     } finally {
       setLoading(false);
     }
