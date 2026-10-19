@@ -8,6 +8,7 @@ import {
   Copy,
   Check,
   Camera,
+  Printer,
   Upload,
   CheckCircle2,
   UserCheck,
@@ -20,6 +21,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import api from "../../../services/api";
+import { printThermalReceipt } from "../../../utils/printHelper";
 
 function PaymentModal({
   order,
@@ -77,60 +79,16 @@ function PaymentModal({
     setTimeout(() => setCopiedAccId(null), 2000);
   };
 
-  // Special Person / VIP Credit Tab State
+  // Customer Contact State
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [creditReason, setCreditReason] = useState("");
-  const [showVipDropdown, setShowVipDropdown] = useState(false);
-  const [selectedVip, setSelectedVip] = useState(null);
-  const [vipList, setVipList] = useState([]);
-  const vipDropdownRef = useRef(null);
 
-  useEffect(() => {
-    localStorage.removeItem("rbms_vip_customers");
-    const fetchVipCustomers = async () => {
-      try {
-        const res = await api("/vip-customers").catch(() => api("/customers").catch(() => ([])));
-        const list = Array.isArray(res) ? res : res?.data || res?.customers || [];
-        setVipList(list);
-      } catch {
-        setVipList([]);
-      }
-    };
-    fetchVipCustomers();
-  }, []);
-
-  // Close VIP dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (vipDropdownRef.current && !vipDropdownRef.current.contains(e.target)) {
-        setShowVipDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const filteredVips = useMemo(() => {
-    const q = customerName.trim().toLowerCase();
-    if (!q) return vipList;
-    return vipList.filter((v) => {
-      const name = (v.name || v.full_name || v.customer_name || "").toLowerCase();
-      const phone = (v.phone || v.phone_number || "").toLowerCase();
-      const company = (v.company || "").toLowerCase();
-      const tier = (v.tier || "").toLowerCase();
-      return name.includes(q) || phone.includes(q) || company.includes(q) || tier.includes(q);
-    });
-  }, [vipList, customerName]);
-
-  const selectedVipStats = useMemo(() => {
-    if (!selectedVip) return null;
-    const limit = Number(selectedVip.credit_limit || selectedVip.creditLimit || 0);
-    const debt = Number(selectedVip.current_debt || selectedVip.currentDebt || selectedVip.debt || 0);
-    const isUnlimited = (selectedVip.tier || "").toLowerCase().includes("gold") || (selectedVip.tier || "").toLowerCase().includes("unlimited") || limit >= 999999;
-    const available = isUnlimited ? 999999999 : Math.max(limit - debt, 0);
-    return { limit, debt, available, isUnlimited };
-  }, [selectedVip]);
+  // Split Tender (Cash + Transfer) States
+  const [splitCashAmount, setSplitCashAmount] = useState("");
+  const [splitTransferAmount, setSplitTransferAmount] = useState("");
+  const [splitTransferProvider, setSplitTransferProvider] = useState("telebirr");
+  const [splitTransferRef, setSplitTransferRef] = useState("");
+  const [splitTendersSuccess, setSplitTendersSuccess] = useState(null);
 
   // PC Camera / WebCam state
   const [showWebcam, setShowWebcam] = useState(false);
@@ -532,6 +490,47 @@ function PaymentModal({
       ? remainingAmount
       : (total > 0 ? total : Number(order?.calculatedTotal || 0)));
 
+  // === SPLIT TENDER AUTO-BALANCING HELPERS ===
+  const handleSplitCashChange = (val) => {
+    setSplitCashAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0 && num <= payableAmount) {
+      setSplitTransferAmount((payableAmount - num).toFixed(2));
+    } else if (val === "") {
+      setSplitTransferAmount("");
+    }
+  };
+
+  const handleSplitTransferChange = (val) => {
+    setSplitTransferAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0 && num <= payableAmount) {
+      setSplitCashAmount((payableAmount - num).toFixed(2));
+    } else if (val === "") {
+      setSplitCashAmount("");
+    }
+  };
+
+  const handleQuickSplitHalf = () => {
+    const half = (payableAmount / 2).toFixed(2);
+    setSplitCashAmount(half);
+    setSplitTransferAmount((payableAmount - Number(half)).toFixed(2));
+  };
+
+  const handleQuickCashPreset = (cashAmt) => {
+    const capped = Math.min(cashAmt, payableAmount);
+    setSplitCashAmount(capped.toFixed(2));
+    setSplitTransferAmount(Math.max(0, payableAmount - capped).toFixed(2));
+  };
+
+  useEffect(() => {
+    if (paymentMethod === "split_tender" && payableAmount > 0 && !splitCashAmount && !splitTransferAmount) {
+      const half = (payableAmount / 2).toFixed(2);
+      setSplitCashAmount(half);
+      setSplitTransferAmount((payableAmount - Number(half)).toFixed(2));
+    }
+  }, [paymentMethod, payableAmount]);
+
   /* 
    * PAYMENT 
    */
@@ -550,14 +549,20 @@ function PaymentModal({
       return;
     }
 
-    if (paymentMethod === "credit" && !customerName.trim()) {
-      setError("Please enter the Special Person / VIP Customer Name for credit authorization.");
-      return;
-    }
-
-    if (paymentMethod === "credit" && selectedVip && selectedVipStats) {
-      if (payableAmount > selectedVipStats.available) {
-        setError(`Insufficient VIP credit limit. Order total (${payableAmount.toFixed(2)} ETB) exceeds available balance (${selectedVipStats.available.toFixed(2)} ETB).`);
+    if (paymentMethod === "split_tender") {
+      const cAmt = parseFloat(splitCashAmount) || 0;
+      const tAmt = parseFloat(splitTransferAmount) || 0;
+      if (cAmt <= 0 || tAmt <= 0) {
+        setError("Please enter both a Cash amount and a Transfer amount greater than 0.");
+        return;
+      }
+      const splitDiff = Number((payableAmount - (cAmt + tAmt)).toFixed(2));
+      if (Math.abs(splitDiff) > 0.05) {
+        setError(
+          splitDiff > 0
+            ? `Total split must match bill (${payableAmount.toFixed(2)} ETB). Unallocated balance: ${splitDiff.toFixed(2)} ETB.`
+            : `Total split exceeds bill (${payableAmount.toFixed(2)} ETB) by ${Math.abs(splitDiff).toFixed(2)} ETB.`
+        );
         return;
       }
     }
@@ -588,34 +593,72 @@ function PaymentModal({
 
       if (realOrderId) {
         try {
-          response = await api(
-            `/pos/orders/${realOrderId}/payment`,
-            {
+          if (paymentMethod === "split_tender") {
+            const cAmt = parseFloat(splitCashAmount) || 0;
+            const tAmt = parseFloat(splitTransferAmount) || 0;
+            const providerName = splitTransferProvider === "telebirr" 
+              ? "Telebirr" 
+              : splitTransferProvider === "cbe_birr" 
+              ? "CBE Birr" 
+              : splitTransferProvider === "card" 
+              ? "Card (POS)" 
+              : "Bank Transfer";
+
+            // 1. Post Cash Tender
+            await api(`/pos/orders/${realOrderId}/payment`, {
               method: "POST",
               body: JSON.stringify({
-                amount: payableAmount,
-                paymentMethod: paymentMethod === "credit" ? "credit" : paymentMethod,
-                customerId: selectedVip?.id || null,
-                vipCustomerId: selectedVip?.id || null,
-                vip_customer_id: selectedVip?.id || null,
-                customerName: selectedVip?.name || customerName.trim() || null,
-                customer_name: selectedVip?.name || customerName.trim() || null,
-                customerPhone: customerPhone.trim() || null,
-                creditReason: creditReason.trim() || null,
-                reference: paymentMode === "split"
-                  ? `SPLIT_SHARE:${selectedItemsSummary.totalSelectedQty}_ITEMS`
-                  : (selectedVip?.name || customerName.trim())
-                    ? `VIP_CREDIT:${selectedVip?.name || customerName.trim()}`
+                amount: cAmt,
+                paymentMethod: "cash",
+                reference: `SPLIT_TENDER: CASH (${cAmt.toFixed(2)} ETB)`,
+                splitItems: paymentMode === "split" ? selectedItemsSummary.selectedList : null,
+                receivedBy: user?.id,
+              }),
+            });
+
+            // 2. Post Digital / Transfer Tender
+            const transRef = splitTransferRef.trim()
+              ? `SPLIT_TENDER: ${providerName.toUpperCase()} (${tAmt.toFixed(2)} ETB) - REF: ${splitTransferRef.trim()}`
+              : `SPLIT_TENDER: ${providerName.toUpperCase()} (${tAmt.toFixed(2)} ETB)`;
+
+            response = await api(`/pos/orders/${realOrderId}/payment`, {
+              method: "POST",
+              body: JSON.stringify({
+                amount: tAmt,
+                paymentMethod: splitTransferProvider,
+                reference: transRef,
+                receiptImage: receiptImage || null,
+                imageUrl: receiptImage || null,
+                receivedBy: user?.id,
+              }),
+            });
+
+            const tenderBreakdown = [
+              { name: "💵 Cash Tender", amount: cAmt },
+              { name: `📲 ${providerName}`, amount: tAmt, ref: splitTransferRef.trim() || undefined },
+            ];
+            setSplitTendersSuccess(tenderBreakdown);
+          } else {
+            response = await api(
+              `/pos/orders/${realOrderId}/payment`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  amount: payableAmount,
+                  paymentMethod,
+                  reference: paymentMode === "split"
+                    ? `SPLIT_SHARE:${selectedItemsSummary.totalSelectedQty}_ITEMS`
                     : receiptImage
                       ? "IMAGE_ATTACHED"
                       : "PAYMENT",
-                receiptImage: receiptImage || null,
-                imageUrl: receiptImage || null,
-                status: "paid",
-                splitItems: paymentMode === "split" ? selectedItemsSummary.selectedList : null,
-              }),
-            }
-          );
+                  receiptImage: receiptImage || null,
+                  imageUrl: receiptImage || null,
+                  status: "paid",
+                  splitItems: paymentMode === "split" ? selectedItemsSummary.selectedList : null,
+                }),
+              }
+            );
+          }
         } catch (primaryErr) {
           console.log("Primary POS payment endpoint notice:", primaryErr?.message || primaryErr);
 
@@ -1367,26 +1410,25 @@ function PaymentModal({
 
               </button>
 
-              {/* CREDIT / SPECIAL PERSON TAB */}
+              {/* SPLIT TENDER (CASH + TRANSFER) */}
               <button
                 type="button"
-                onClick={() =>
-                  setPaymentMethod(
-                    "credit"
-                  )
-                }
-                className={`rounded-xl border p-3.5 text-center transition ${paymentMethod === "credit"
-                    ? "border-amber-500 bg-amber-50 text-amber-700 shadow-xs ring-2 ring-amber-400/30"
+                onClick={() => setPaymentMethod("split_tender")}
+                className={`rounded-xl border p-3.5 text-center transition ${paymentMethod === "split_tender"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-xs ring-2 ring-emerald-400/30 font-bold"
                     : "border-gray-200 hover:bg-gray-50 text-slate-700"
                   }`}
               >
-                <UserCheck
-                  className="mx-auto mb-1.5 text-amber-600"
-                  size={22}
-                />
-
-                <span className="text-xs font-bold block">
-                  Credit / VIP
+                <div className="flex items-center justify-center gap-1 mx-auto mb-1.5 text-emerald-600">
+                  <Banknote size={18} />
+                  <span className="text-xs font-black">+</span>
+                  <Smartphone size={18} />
+                </div>
+                <span className="text-xs font-bold block leading-tight">
+                  Split Tender
+                </span>
+                <span className="text-[10px] text-emerald-600 font-semibold block">
+                  Cash + Transfer
                 </span>
               </button>
 
@@ -1395,204 +1437,240 @@ function PaymentModal({
           </div>
 
           {/* CREDIT / VIP PERSON DETAILS */}
-          {paymentMethod === "credit" && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3.5 animate-in fade-in duration-150">
-              <div className="flex items-center gap-2 border-b border-amber-200/80 pb-2.5">
-                <UserCheck className="h-5 w-5 text-amber-700" />
-                <div>
-                  <h4 className="text-sm font-bold text-amber-950">
-                    Special Person / VIP Credit Authorization
-                  </h4>
-                  <p className="text-xs text-amber-800">
-                    Requires Admin or Manager approval before settlement.
+          {paymentMethod === "split_tender" && (
+            <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50/70 to-white p-4 sm:p-5 space-y-4 shadow-xs animate-in fade-in duration-150">
+              <div className="flex items-center justify-between border-b border-emerald-200/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-black">
+                    ⚡
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-emerald-950">
+                      Multi-Tender / Split Settle (Cash + Transfer)
+                    </h4>
+                    <p className="text-xs text-emerald-800 font-medium">
+                      Split guest payment across physical Cash & digital Transfer.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Bill</span>
+                  <span className="text-sm font-black text-slate-900">{payableAmount.toFixed(2)} ETB</span>
+                </div>
+              </div>
+
+              {/* Quick Split Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-xs font-bold text-slate-500 mr-1">Quick:</span>
+                <button
+                  type="button"
+                  onClick={handleQuickSplitHalf}
+                  className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100 shadow-2xs transition cursor-pointer"
+                >
+                  Exact 50/50 Split
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickCashPreset(100)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cash 100
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickCashPreset(200)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cash 200
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickCashPreset(500)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cash 500
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickCashPreset(1000)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cash 1,000
+                </button>
+              </div>
+
+              {/* Tender Inputs Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* 1. Cash Input */}
+                <div className="rounded-xl border border-emerald-200 bg-white p-3.5 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Banknote className="h-4 w-4 text-emerald-600" />
+                      <span>💵 Cash Paid</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      Physical Drawer
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max={payableAmount}
+                      value={splitCashAmount}
+                      onChange={(e) => handleSplitCashChange(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-xl border border-slate-300 p-2.5 pr-14 text-base font-black text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none"
+                    />
+                    <span className="absolute right-3 top-3 text-xs font-bold text-slate-400">
+                      ETB
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    Added to physical drawer cash for shift audit
+                  </p>
+                </div>
+
+                {/* 2. Transfer Input */}
+                <div className="rounded-xl border border-indigo-200 bg-white p-3.5 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Smartphone className="h-4 w-4 text-indigo-600" />
+                      <span>📲 Transfer Paid</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                      Digital Inflow
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max={payableAmount}
+                      value={splitTransferAmount}
+                      onChange={(e) => handleSplitTransferChange(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-xl border border-slate-300 p-2.5 pr-14 text-base font-black text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
+                    />
+                    <span className="absolute right-3 top-3 text-xs font-bold text-slate-400">
+                      ETB
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    Auto-calculated remaining digital balance
                   </p>
                 </div>
               </div>
 
-              {/* Selected VIP Active Badge */}
-              {selectedVip && selectedVipStats ? (
-                <div className="rounded-xl border border-emerald-300 bg-emerald-50/80 p-3 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-emerald-950 flex items-center gap-1.5 text-sm">
-                      👑 VIP Customer: {selectedVip.name || selectedVip.full_name}
-                      <span className="rounded-full bg-emerald-200/80 px-2 py-0.5 text-[10px] text-emerald-900 border border-emerald-300">
-                        {selectedVip.tier || "VIP"}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedVip(null);
-                        setCustomerName("");
-                        setCustomerPhone("");
-                      }}
-                      className="text-[11px] font-bold text-slate-500 hover:text-slate-900 underline"
-                    >
-                      Clear / Change VIP
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-emerald-200/70">
-                    <div className="bg-white/80 rounded-lg p-1.5 border border-emerald-100">
-                      <span className="block text-[10px] text-slate-500 font-medium">Credit Limit</span>
-                      <span className="font-bold text-slate-900">
-                        {selectedVipStats.isUnlimited ? "♾️ Unlimited" : `${selectedVipStats.limit.toLocaleString()} ETB`}
-                      </span>
-                    </div>
-                    <div className="bg-white/80 rounded-lg p-1.5 border border-emerald-100">
-                      <span className="block text-[10px] text-slate-500 font-medium">Current Debt</span>
-                      <span className="font-bold text-amber-700">{selectedVipStats.debt.toLocaleString()} ETB</span>
-                    </div>
-                    <div className="bg-white/80 rounded-lg p-1.5 border border-emerald-100">
-                      <span className="block text-[10px] text-slate-500 font-medium">Available Credit</span>
-                      <span className="font-extrabold text-emerald-700">
-                        {selectedVipStats.isUnlimited ? "♾️ Unlimited" : `${selectedVipStats.available.toLocaleString()} ETB`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!selectedVipStats.isUnlimited && payableAmount > selectedVipStats.available && (
-                    <div className="rounded-lg bg-amber-100 p-2 text-[11px] font-bold text-amber-900 border border-amber-300 flex items-center gap-1.5">
-                      <span>⚠️ Note: Order total ({payableAmount.toFixed(2)} ETB) exceeds available credit ({selectedVipStats.available.toFixed(2)} ETB). Manager approval required.</span>
-                    </div>
-                  )}
+              {/* Transfer Provider Selector */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Transfer Service / Provider
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSplitTransferProvider("telebirr")}
+                    className={`rounded-xl border py-2 px-3 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      splitTransferProvider === "telebirr"
+                        ? "border-emerald-500 bg-emerald-100/70 text-emerald-950 shadow-2xs ring-1 ring-emerald-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>📲 Telebirr</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSplitTransferProvider("cbe_birr")}
+                    className={`rounded-xl border py-2 px-3 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      splitTransferProvider === "cbe_birr"
+                        ? "border-purple-500 bg-purple-100/70 text-purple-950 shadow-2xs ring-1 ring-purple-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>🏦 CBE Birr</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSplitTransferProvider("bank_transfer")}
+                    className={`rounded-xl border py-2 px-3 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      splitTransferProvider === "bank_transfer"
+                        ? "border-blue-500 bg-blue-100/70 text-blue-950 shadow-2xs ring-1 ring-blue-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>🏛️ Bank Transfer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSplitTransferProvider("card")}
+                    className={`rounded-xl border py-2 px-3 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      splitTransferProvider === "card"
+                        ? "border-amber-500 bg-amber-100/70 text-amber-950 shadow-2xs ring-1 ring-amber-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>💳 Card (POS)</span>
+                  </button>
                 </div>
-              ) : null}
+              </div>
 
-              {/* VIP Customer Search Input & Dropdown */}
-              <div className="relative" ref={vipDropdownRef}>
-                <label className="block text-xs font-bold text-amber-900 mb-1">
-                  Search Registered VIP Customer / Enter Guest Name *
+              {/* Transfer Reference Code */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700">
+                  Transaction / Transfer Reference (Optional)
                 </label>
                 <input
                   type="text"
-                  value={customerName}
-                  onFocus={() => setShowVipDropdown(true)}
-                  onChange={(e) => {
-                    setCustomerName(e.target.value);
-                    setShowVipDropdown(true);
-                    setSelectedVip(null);
-                  }}
-                  placeholder="Type VIP name, phone number, or company..."
-                  className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                  value={splitTransferRef}
+                  onChange={(e) => setSplitTransferRef(e.target.value)}
+                  placeholder="e.g. Telebirr Txn # or CBE Ref"
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
                 />
-
-                {/* Live VIP Search Dropdown */}
-                {showVipDropdown && (
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-amber-200 bg-white shadow-2xl">
-                    <p className="px-3 py-1.5 text-[10px] font-extrabold uppercase text-amber-800 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
-                      <span>Registered VIP Directory ({filteredVips.length})</span>
-                      <span className="text-[9px] text-slate-400 font-normal">Click to select customer</span>
-                    </p>
-
-                    {filteredVips.length > 0 ? (
-                      filteredVips.map((v) => {
-                        const vName = v.name || v.full_name || v.customer_name || "VIP Customer";
-                        const vPhone = v.phone || v.phone_number || "";
-                        const vLimit = Number(v.credit_limit || v.creditLimit || 0);
-                        const vDebt = Number(v.current_debt || v.currentDebt || v.debt || 0);
-                        const isUnl = (v.tier || "").toLowerCase().includes("gold") || (v.tier || "").toLowerCase().includes("unlimited") || vLimit >= 999999;
-
-                        return (
-                          <button
-                            key={v.id || v.customer_id || vName}
-                            type="button"
-                            onClick={() => {
-                              setCustomerName(vName);
-                              setCustomerPhone(vPhone);
-                              setSelectedVip(v);
-                              setShowVipDropdown(false);
-                            }}
-                            className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs hover:bg-amber-50 transition border-b border-slate-50 last:border-0 cursor-pointer"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                                👑 {vName}
-                                <span className="text-[10px] text-amber-800 font-semibold rounded-md bg-amber-100 px-1.5 py-0.5">
-                                  {v.tier || "VIP"}
-                                </span>
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                {vPhone ? `📞 ${vPhone}` : "No Phone"} {v.company ? `• ${v.company}` : ""}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <span className="block font-black text-emerald-700 text-xs">
-                                Available: {isUnl ? "♾️ Unlimited" : `${Math.max(vLimit - vDebt, 0).toLocaleString()} ETB`}
-                              </span>
-                              <span className="text-[10px] text-slate-500 block">
-                                {isUnl ? "Unlimited Credit Ceiling" : `Limit: ${vLimit.toLocaleString()} • Debt: ${vDebt.toLocaleString()}`}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="p-3 text-center text-xs text-slate-500 font-medium">
-                        No registered VIP found matching "{customerName}". Enter contact details below for custom guest credit.
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-amber-900 mb-1">
-                    Phone / Contact Number
-                  </label>
-                  <input
-                    type="text"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="0911XXXXXX"
-                    className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                  />
-                </div>
+              {/* Live Balance Summary & Validation Banner */}
+              {(() => {
+                const cVal = parseFloat(splitCashAmount) || 0;
+                const tVal = parseFloat(splitTransferAmount) || 0;
+                const totalAlloc = Number((cVal + tVal).toFixed(2));
+                const diff = Number((payableAmount - totalAlloc).toFixed(2));
+                const isBalanced = Math.abs(diff) <= 0.05 && cVal > 0 && tVal > 0;
 
-                <div>
-                  <label className="block text-xs font-bold text-amber-900 mb-1">
-                    Reason / Authorization Note
-                  </label>
-                  <input
-                    type="text"
-                    value={creditReason}
-                    onChange={(e) => setCreditReason(e.target.value)}
-                    placeholder="e.g. Monthly VIP Tab / Manager Approval"
-                    className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
+                if (isBalanced) {
+                  return (
+                    <div className="rounded-xl border border-emerald-300 bg-emerald-100/60 p-3 flex items-center justify-between text-xs font-bold text-emerald-900">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>Split Balanced! 100% of bill allocated.</span>
+                      </span>
+                      <span>{totalAlloc.toFixed(2)} ETB</span>
+                    </div>
+                  );
+                } else if (diff > 0.05) {
+                  return (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 flex items-center justify-between text-xs font-bold text-amber-900">
+                      <span>⚠️ Unallocated Balance:</span>
+                      <span>{diff.toFixed(2)} ETB remaining</span>
+                    </div>
+                  );
+                } else if (diff < -0.05) {
+                  return (
+                    <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 flex items-center justify-between text-xs font-bold text-rose-900">
+                      <span>⚠️ Overallocated:</span>
+                      <span>Exceeds bill by {Math.abs(diff).toFixed(2)} ETB</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
 
-          {/* AMOUNT (DISABLED / AUTO-SYNCED TO PREVENT MANUAL TYPING ERRORS) */}
-          <div>
-
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-bold text-slate-800">
-                Payment Amount (Calculated)
-              </label>
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                🔒 Auto-Calculated Total
-              </span>
-            </div>
-
-            <input
-              type="text"
-              value={`${payableAmount.toFixed(2)} ETB`}
-              disabled
-              readOnly
-              className="w-full rounded-2xl border border-slate-200 bg-slate-100 p-4 text-xl font-black text-slate-900 shadow-inner cursor-not-allowed"
-            />
-            <p className="mt-1.5 text-xs text-slate-500 font-medium">
-              Calculated total balance for food, drinks, and tax for this table order.
-            </p>
-
-          </div>
-
           {/* CAMERA RECEIPT PHOTO FOR MOBILE & CARD PAYMENTS */}
-          {(paymentMethod === "card" || paymentMethod === "mobile_money") && (
+          {(paymentMethod === "card" || paymentMethod === "mobile_money" || paymentMethod === "split_tender") && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">

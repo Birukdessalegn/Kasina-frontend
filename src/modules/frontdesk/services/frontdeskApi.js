@@ -188,5 +188,5 @@ export const getReservationReports = (params = {}) => {
   return api(`/room-reservations/reports/summary${qStr ? `?${qStr}` : ""}`);
 };
 
-export const getVipCustomers = () => api("/vip-customers");
+export const getVipCustomers = () => Promise.resolve([]);
 

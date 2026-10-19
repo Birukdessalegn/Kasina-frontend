@@ -440,7 +440,7 @@ function TodaySalesAuditPage() {
     if (m === "credit" || m === "credit_pending") {
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-800 border border-amber-200">
-          📋 VIP Credit
+          📋 Unpaid / Credit
         </span>
       );
     }
@@ -834,7 +834,7 @@ function TodaySalesAuditPage() {
                   : "bg-purple-50 text-purple-700 hover:bg-purple-100"
               }`}
             >
-              VIP Credit ({creditOrders.length})
+              Unpaid ({creditOrders.length})
             </button>
 
             {/* Waiter Filter Selector */}

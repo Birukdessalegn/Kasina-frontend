@@ -996,3 +996,316 @@ export const printOrderReceipt = (order, options = {}) => {
 };
 
 
+
+
+export const printThermalReceipt = ({
+  restaurantName = "RESTAURANT & BAR",
+  title = "CUSTOMER RECEIPT",
+  orderNumber,
+  tableNumber,
+  serverName,
+  customerName,
+  paymentMethod,
+  items = [],
+  totalPaid,
+  remainingBalance,
+  reference,
+  date = new Date(),
+}) => {
+  const oldIframe = document.getElementById("rbms-thermal-print-frame");
+  if (oldIframe) oldIframe.remove();
+
+  const iframe = document.createElement("iframe");
+  iframe.id = "rbms-thermal-print-frame";
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Receipt - #${orderNumber || "POS"}</title>
+        <style>
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', Courier, monospace, system-ui;
+            width: 76mm;
+            margin: 0 auto;
+            padding: 8px 4px;
+            color: #000;
+            font-size: 11px;
+            line-height: 1.35;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .font-bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .double-divider { border-top: 2px solid #000; margin: 6px 0; }
+          .flex-between { display: flex; justify-content: space-between; }
+          .item-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div style="font-size: 15px; font-weight: 900; text-transform: uppercase;">${restaurantName}</div>
+          <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">*** ${title} ***</div>
+          <div style="font-size: 10px; margin-top: 3px;">Order #${orderNumber} ${tableNumber ? '• Table ' + tableNumber : ''}</div>
+          <div style="font-size: 9px; color: #444;">${new Date(date).toLocaleString()}</div>
+          ${customerName ? `<div style="font-size: 10px; font-weight: bold; margin-top: 2px;">Customer: ${customerName}</div>` : ''}
+          ${serverName ? `<div style="font-size: 9px; color: #444;">Server: ${serverName}</div>` : ''}
+        </div>
+
+        <div class="divider"></div>
+
+        ${items && items.length > 0 ? `
+          <div style="font-size: 9px; font-weight: bold; margin-bottom: 4px;" class="flex-between">
+            <span>QTY  ITEM</span>
+            <span>TOTAL</span>
+          </div>
+          ${items.map(it => {
+            const portion = parseItemPortion(it);
+            const lineTotal = Number(it.selectedTotal || it.total || ((it.selectedQuantity || it.quantity || 1) * (it.unit_price || it.price || 0))).toFixed(2);
+            return `
+              <div class="item-row">
+                <span style="max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <b>${portion.displayServing}</b> ${it.name || it.product_name || 'Item'}
+                </span>
+                <span>${lineTotal}</span>
+              </div>
+            `;
+          }).join('')}
+          <div class="divider"></div>
+        ` : ''}
+
+        <div class="flex-between font-bold" style="font-size: 13px; margin: 5px 0;">
+          <span>PAID AMOUNT:</span>
+          <span>${Number(totalPaid || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px;">
+          <span>Payment Method:</span>
+          <span style="text-transform: uppercase; font-weight: bold;">${paymentMethod || 'CASH'}</span>
+        </div>
+        ${reference ? `
+          <div class="flex-between" style="font-size: 9px; color: #444;">
+            <span>Reference:</span>
+            <span>${reference}</span>
+          </div>
+        ` : ''}
+
+        ${remainingBalance !== undefined && remainingBalance !== null ? `
+          <div class="divider"></div>
+          <div class="flex-between font-bold" style="font-size: 11px;">
+            <span>REMAINING TABLE TAB:</span>
+            <span>${Number(remainingBalance).toFixed(2)} ETB</span>
+          </div>
+        ` : ''}
+
+        <div class="double-divider"></div>
+        <div class="text-center" style="font-size: 9px; margin-top: 6px;">
+          Thank you! Please come again.
+        </div>
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }, 300);
+};
+
+/**
+ * Daily End-of-Day Financial Z-Report Thermal Printer (80mm)
+ */
+export const printZReportThermal = (zData) => {
+  const existingFrame = document.getElementById("print-iframe-zreport");
+  if (existingFrame) existingFrame.remove();
+
+  const iframe = document.createElement("iframe");
+  iframe.id = "print-iframe-zreport";
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  document.body.appendChild(iframe);
+
+  const restaurantName = zData.restaurantName || "THE OAK";
+  const restaurantSub = zData.restaurantSub || "RESTAURANT & BAR";
+  const dateStr = zData.businessDate || new Date().toISOString().split("T")[0];
+  const printedAt = new Date().toLocaleString();
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Z-Report - ${dateStr}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', Courier, monospace, system-ui, sans-serif;
+            width: 76mm;
+            margin: 0 auto;
+            padding: 8px 4px;
+            color: #000;
+            font-size: 11px;
+            line-height: 1.35;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .font-bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .double-divider { border-top: 2px solid #000; margin: 6px 0; }
+          .flex-between { display: flex; justify-content: space-between; align-items: baseline; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">${restaurantName}</div>
+          <div style="font-size: 9px; text-transform: uppercase; color: #333;">${restaurantSub}</div>
+          <div class="divider"></div>
+          <div style="font-size: 13px; font-weight: 900; letter-spacing: 1px;">*** DAILY Z-REPORT ***</div>
+          <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">CLOSING FINANCIAL AUDIT</div>
+          <div style="font-size: 10px; margin-top: 2px;">Business Date: <b>${dateStr}</b></div>
+          <div style="font-size: 9px; color: #555;">Generated: ${printedAt}</div>
+          ${zData.auditorName ? `<div style="font-size: 9px;">Auditor: <b>${zData.auditorName}</b></div>` : ""}
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div style="font-size: 10px; font-weight: 900; margin-bottom: 3px;">1. SALES REVENUE BREAKDOWN</div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Food / Kitchen Sales:</span>
+          <span>${Number(zData.foodSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Bar / Beverage Sales:</span>
+          <span>${Number(zData.barSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Other / General Sales:</span>
+          <span>${Number(zData.otherSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 9px; color: #555; margin-bottom: 2px;">
+          <span>Total Tickets Served:</span>
+          <span>${zData.ticketsCount || 0} Orders</span>
+        </div>
+        <div class="flex-between" style="font-size: 9px; color: #555; margin-bottom: 2px;">
+          <span>Average Bill / Ticket:</span>
+          <span>${Number(zData.avgTicket || 0).toFixed(2)} ETB</span>
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div class="flex-between font-bold" style="font-size: 12px; margin: 3px 0;">
+          <span>TOTAL GROSS SALES:</span>
+          <span>${Number(zData.grossSales || 0).toFixed(2)} ETB</span>
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div style="font-size: 10px; font-weight: 900; margin-bottom: 3px;">2. PAYMENT TENDER BREAKDOWN</div>
+        <div class="flex-between font-bold" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Cash Collected:</span>
+          <span>${Number(zData.cashSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Telebirr Digital:</span>
+          <span>${Number(zData.telebirrSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>CBE / Bank Transfer:</span>
+          <span>${Number(zData.bankSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Card / POS Terminal:</span>
+          <span>${Number(zData.cardSales || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px; color: #333;">
+          <span>VIP Credit (Unsettled):</span>
+          <span>${Number(zData.creditSales || 0).toFixed(2)} ETB</span>
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div style="font-size: 10px; font-weight: 900; margin-bottom: 3px;">3. CASH DRAWER RECONCILIATION</div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Opening Float:</span>
+          <span>${Number(zData.openingFloat || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Expected Cash in Drawer:</span>
+          <span>${Number(zData.expectedCash || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between font-bold" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Actual Counted Cash:</span>
+          <span>${Number(zData.actualCash || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between font-bold" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Cash Variance:</span>
+          <span>${Number(zData.variance || 0) >= 0 ? "+" : ""}${Number(zData.variance || 0).toFixed(2)} ETB</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <div style="font-size: 10px; font-weight: 900; margin-bottom: 3px;">4. CASH DEDUCTIONS / EXPENSES</div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Cash Vouchers & Expenses:</span>
+          <span>-${Number(zData.cashExpenses || 0).toFixed(2)} ETB</span>
+        </div>
+        <div class="flex-between" style="font-size: 10px; margin-bottom: 2px;">
+          <span>Supplier Cash Payouts:</span>
+          <span>-${Number(zData.cashPurchases || 0).toFixed(2)} ETB</span>
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div class="flex-between font-bold" style="font-size: 13px; margin: 4px 0; background: #eee; padding: 3px;">
+          <span>NET CASH FOR SAFE:</span>
+          <span>${Number(zData.netCashForSafe || 0).toFixed(2)} ETB</span>
+        </div>
+
+        <div class="double-divider"></div>
+
+        <div style="margin-top: 15px; font-size: 9px;">
+          <div class="flex-between" style="margin-bottom: 12px;">
+            <span>Manager Signature: __________________</span>
+          </div>
+          <div class="flex-between">
+            <span>Cashier Signature: __________________</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="text-center" style="font-size: 8px; color: #555; margin-top: 4px;">
+          END OF DAILY Z-REPORT AUDIT SLIP
+        </div>
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }, 300);
+};

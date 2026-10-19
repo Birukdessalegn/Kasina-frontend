@@ -225,6 +225,7 @@ function FinanceReportsPage() {
         title: `Supplier PO #${p.po_number || p.id} (${p.supplier_name || "Supplier"})`,
         category: "Stock Purchase",
         paymentMethod: (p.payment_status || "credit").toLowerCase(),
+        isPaid: (p.payment_status || "").toLowerCase() === "paid",
         amount: amt,
         isIncome: false,
         date: dateStr,
@@ -281,13 +282,37 @@ function FinanceReportsPage() {
     return totalRoomRevenue + totalPosRevenue;
   }, [totalRoomRevenue, totalPosRevenue]);
 
-  const totalExpenses = useMemo(() => {
+  const operatingExpenses = useMemo(() => {
     return filteredLedger
-      .filter((tx) => !tx.isIncome)
+      .filter((tx) => tx.type === "Expense")
       .reduce((sum, tx) => sum + tx.amount, 0);
   }, [filteredLedger]);
 
-  const netProfit = totalRevenue - totalExpenses;
+  const paidPurchases = useMemo(() => {
+    return filteredLedger
+      .filter((tx) => tx.type === "Purchase" && tx.isPaid)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [filteredLedger]);
+
+  const unpaidPurchases = useMemo(() => {
+    return filteredLedger
+      .filter((tx) => tx.type === "Purchase" && !tx.isPaid)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [filteredLedger]);
+
+  const unpaidPurchasesCount = useMemo(() => {
+    return filteredLedger.filter((tx) => tx.type === "Purchase" && !tx.isPaid).length;
+  }, [filteredLedger]);
+
+  // Total Realized Cash Outflow (Operating Expenses + Actually Paid Stock Purchases)
+  const totalExpenses = useMemo(() => {
+    return operatingExpenses + paidPurchases;
+  }, [operatingExpenses, paidPurchases]);
+
+  // Net Cash Margin = Total Revenue - Actual Paid Expenses & Stock
+  const netProfit = useMemo(() => {
+    return totalRevenue - totalExpenses;
+  }, [totalRevenue, totalExpenses]);
 
   const totalDigitalSales = useMemo(() => {
     return filteredLedger

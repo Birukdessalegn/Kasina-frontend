@@ -79,7 +79,7 @@ export default function AdminDashboardPage() {
         api("/kitchen").catch(() => api("/kitchen/orders").catch(() => [])),
         api("/bar/orders").catch(() => api("/bar").catch(() => [])),
         api("/expenses").catch(() => []),
-        api("/vip-customers").catch(() => api("/customers/vip").catch(() => ([]))),
+        Promise.resolve([]),
         api("/payments").catch(() => ([])),
         api("/inventory/multi-location").catch(() => ({})),
         api("/room-reservations").catch(() => ({ data: [] })),
@@ -133,53 +133,11 @@ export default function AdminDashboardPage() {
       setBarOrders(rawBarOrders);
       setExpenses(Array.isArray(expRes) ? expRes : expRes.expenses || expRes.data || []);
       
-      const fetchedVips = vipRes.customers || vipRes.data || (Array.isArray(vipRes) ? vipRes : []);
+      const fetchedVips = [];
       setVipCustomers(fetchedVips);
 
       // Fetch dedicated VIP customer payments from backend service endpoints
-      if (Array.isArray(fetchedVips) && fetchedVips.length > 0) {
-        try {
-          const vipPaymentResults = await Promise.allSettled(
-            fetchedVips.map((vc) =>
-              api(`/vip-customers/${vc.id}/payments`)
-                .catch(() => api(`/vip-customers/${vc.id}/transactions`))
-                .catch(() => api(`/customers/vip/${vc.id}/payments`))
-                .catch(() => ({ data: [] }))
-            )
-          );
-
-          const allVipPayments = [];
-          vipPaymentResults.forEach((res, idx) => {
-            if (res.status === "fulfilled" && res.value) {
-              const vc = fetchedVips[idx];
-              const pList = res.value.data || res.value.payments || res.value.transactions || (Array.isArray(res.value) ? res.value : []);
-              if (Array.isArray(pList)) {
-                pList.forEach((p) => {
-                  allVipPayments.push({
-                    ...p,
-                    id: p.payment_id || p.id,
-                    amount: Number(p.payment_amount || p.amount || 0),
-                    payment_method: p.payment_method || "VIP Credit",
-                    reference: p.payment_reference || p.reference || "",
-                    status: p.payment_status || p.status || "paid",
-                    paid_at: p.paid_at || p.order_created_at || p.created_at || p.date,
-                    created_at: p.paid_at || p.order_created_at || p.created_at || p.date,
-                    vip_customer_id: vc.id,
-                    customer_name: vc.name,
-                    customer_phone: vc.phone,
-                    tier: vc.tier,
-                  });
-                });
-              }
-            }
-          });
-
-          if (allVipPayments.length > 0) {
-            setVipPaymentsList(allVipPayments);
-          }
-        } catch (vpErr) {
-          console.log("VIP customer payments fetch notice:", vpErr);
-        }
+      // VIP customer handling removed
       }
 
       setPayments(pmtsRes.payments || pmtsRes.data || (Array.isArray(pmtsRes) ? pmtsRes : []));
@@ -368,7 +326,7 @@ export default function AdminDashboardPage() {
     );
 
     const lifetimeGrossRevenue = Math.max(
-      posSalesAllTime + roomSalesAllTime + vipRepaymentsAllTime,
+      posSalesAllTime + roomSalesAllTime,
       statsGrandAllTime
     );
 
@@ -380,7 +338,7 @@ export default function AdminDashboardPage() {
     );
 
     const todayGrossRevenue = Math.max(
-      todayPosSales + todayRoomSales + todayVipRepayments,
+      todayPosSales + todayRoomSales,
       statsGrandToday
     );
 

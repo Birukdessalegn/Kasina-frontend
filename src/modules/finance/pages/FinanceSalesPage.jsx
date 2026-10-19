@@ -1,3 +1,4 @@
+import DailyZReportModal from "../components/DailyZReportModal";
 import { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp,
@@ -65,6 +66,7 @@ function FinanceSalesPage() {
 
   // Selected Transaction for Modal View
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [showZReport, setShowZReport] = useState(false);
 
   // Fetch Whole Hotel Sales Data (Room Lodging + Restaurant & Bar POS)
   const fetchSalesData = async () => {
@@ -397,6 +399,14 @@ function FinanceSalesPage() {
 
           <button
             type="button"
+            onClick={() => setShowZReport(true)}
+            className="flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition"
+          >
+            <Receipt className="h-4 w-4" />
+            📑 Daily Z-Report
+          </button>
+          <button
+            type="button"
             onClick={handlePrint}
             className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition"
           >
@@ -591,18 +601,44 @@ function FinanceSalesPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payment:</span>
-            <select
-              value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500"
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 px-2">Payment:</span>
+            <button
+              type="button"
+              onClick={() => setPaymentFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                paymentFilter === "all" ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              <option value="all">All Channels (Cash, Digital, Credit)</option>
-              <option value="cash">Cash Only</option>
-              <option value="digital">Digital (Telebirr, CBE, Card)</option>
-              <option value="credit">VIP Credit Tabs</option>
-            </select>
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentFilter("cash")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                paymentFilter === "cash" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              💵 Cash
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentFilter("digital")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                paymentFilter === "digital" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              📲 Transfer (Telebirr/CBE)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentFilter("card")}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                paymentFilter === "card" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              💳 Card
+            </button>
           </div>
         </div>
       </div>
