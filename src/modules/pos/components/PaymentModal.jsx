@@ -1380,9 +1380,7 @@ function PaymentModal({
                   size={22}
                 />
 
-                <span className="text-xs font-bold block">
-                  Card
-                </span>
+                <span className="text-xs font-bold block">POS Machine</span>
               </button>
 
               {/* MOBILE */}
@@ -1404,9 +1402,7 @@ function PaymentModal({
                   size={22}
                 />
 
-                <span className="text-xs font-bold block">
-                  Mobile
-                </span>
+                <span className="text-xs font-bold block">Transfer</span>
 
               </button>
 
@@ -1617,19 +1613,7 @@ function PaymentModal({
                 </div>
               </div>
 
-              {/* Transfer Reference Code */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">
-                  Transaction / Transfer Reference (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={splitTransferRef}
-                  onChange={(e) => setSplitTransferRef(e.target.value)}
-                  placeholder="e.g. Telebirr Txn # or CBE Ref"
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
-                />
-              </div>
+              {/* Reference text bar removed */}
 
               {/* Live Balance Summary & Validation Banner */}
               {(() => {

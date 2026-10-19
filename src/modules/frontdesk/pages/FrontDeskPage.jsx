@@ -1793,12 +1793,9 @@ export default function FrontDeskPage() {
                       onChange={(e) => setBookingForm({ ...bookingForm, payment_method: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm outline-none focus:border-blue-500"
                     >
-                      <option value="cash">Cash</option>
-                      <option value="card">Card (POS / Visa / Mastercard)</option>
-                      <option value="telebirr">Telebirr</option>
-                      <option value="cbe_birr">CBE Birr</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="other">Other</option>
+                      <option value="cash">💵 Cash</option>
+                      <option value="transfer">📲 Transfer</option>
+                      <option value="pos_machine">💳 POS Machine</option>
                     </select>
                   </div>
                 </div>
@@ -1916,11 +1913,9 @@ export default function FrontDeskPage() {
                       }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                     >
-                      <option value="cash">Cash</option>
-                      <option value="card">Card (POS / Visa / Mastercard)</option>
-                      <option value="telebirr">Telebirr</option>
-                      <option value="cbe_birr">CBE Birr</option>
-                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="cash">💵 Cash</option>
+                      <option value="transfer">📲 Transfer</option>
+                      <option value="pos_machine">💳 POS Machine</option>
                       <option value="other">Other</option>
                     </select>
                   </div>
@@ -2853,32 +2848,16 @@ export default function FrontDeskPage() {
                           onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
                           className="w-full rounded-xl border border-slate-300 p-2.5 text-xs font-semibold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white"
                         >
-                          <option value="cash">Cash</option>
-                          <option value="cbe">Commercial Bank of Ethiopia (CBE)</option>
-                          <option value="telebirr">Telebirr</option>
-                          <option value="awash">Awash Bank</option>
-                          <option value="abyssinia">Bank of Abyssinia (BoA)</option>
-                          <option value="card">Credit / Debit Card</option>
-                          <option value="other">Other Bank Transfer</option>
+                          <option value="cash">💵 Cash</option>
+                      <option value="transfer">📲 Transfer</option>
+                      <option value="pos_machine">💳 POS Machine</option>
                         </select>
                       </div>
 
-                      {/* Transaction Reference */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Transaction Reference / Slip # (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. TXN-938210 or CBE Slip No."
-                          value={paymentForm.transaction_reference}
-                          onChange={(e) => setPaymentForm({ ...paymentForm, transaction_reference: e.target.value })}
-                          className="w-full rounded-xl border border-slate-300 p-2.5 text-xs outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                        />
-                      </div>
+                      {/* Transaction Reference input removed: staff use direct Camera Capture */}
 
                       {/* Payment Proof / Camera Capture for Digital / Bank Transfers */}
-                      {paymentForm.payment_method !== "cash" && (
+                      {paymentForm.payment_method === "transfer" && (
                         <div>
                           <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                             <span className="flex items-center gap-1.5">

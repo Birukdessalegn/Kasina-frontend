@@ -1126,10 +1126,9 @@ export default function ReservationsListPage() {
                       onChange={(e) => setNewResForm({ ...newResForm, payment_method: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                     >
-                      <option value="cash">Cash</option>
-                      <option value="card">Credit / Debit Card</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="mobile_money">Mobile Money (Telebirr / CBE)</option>
+                      <option value="cash">💵 Cash</option>
+                  <option value="transfer">📲 Transfer</option>
+                  <option value="pos_machine">💳 POS Machine</option>
                     </select>
                   </div>
 
@@ -1221,12 +1220,9 @@ export default function ReservationsListPage() {
                   onChange={(e) => setPayMethod(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                 >
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="telebirr">Telebirr</option>
-                  <option value="cbe_birr">CBE Birr</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="other">Other</option>
+                  <option value="cash">💵 Cash</option>
+                  <option value="transfer">📲 Transfer</option>
+                  <option value="pos_machine">💳 POS Machine</option>
                 </select>
               </div>
 

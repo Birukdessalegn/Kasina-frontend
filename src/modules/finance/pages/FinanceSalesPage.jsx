@@ -650,16 +650,16 @@ function FinanceSalesPage() {
                 paymentFilter === "digital" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              📲 Transfer (Telebirr/CBE)
+              📲 Transfer
             </button>
             <button
               type="button"
               onClick={() => setPaymentFilter("card")}
               className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                paymentFilter === "card" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                paymentFilter === "card" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              💳 Card
+              💳 POS Machine
             </button>
           </div>
         </div>
@@ -778,7 +778,14 @@ function FinanceSalesPage() {
                             }`}
                           >
                             <CreditCard className="h-3 w-3" />
-                            {r.payment_method}
+                            {(() => {
+                            const pm = (r.payment_method || '').toLowerCase();
+                            if (pm === 'cash') return '💵 Cash';
+                            if (pm.includes('card') || pm.includes('pos')) return '💳 POS Machine';
+                            if (pm.includes('transfer') || pm.includes('tele') || pm.includes('cbe') || pm.includes('mobile')) return '📲 Transfer';
+                            if (pm === 'split') return '⚡ Split Tender';
+                            return r.payment_method;
+                          })()}
                           </span>
 
                           {/* Transfer Proof Button */}
@@ -876,7 +883,14 @@ function FinanceSalesPage() {
                 <td className="p-2 font-mono font-bold">{r.code}</td>
                 <td className="p-2">{r.department}</td>
                 <td className="p-2">{r.customer} ({r.tableOrRoom})</td>
-                <td className="p-2 uppercase">{r.payment_method}</td>
+                <td className="p-2 uppercase">{(() => {
+                            const pm = (r.payment_method || '').toLowerCase();
+                            if (pm === 'cash') return '💵 Cash';
+                            if (pm.includes('card') || pm.includes('pos')) return '💳 POS Machine';
+                            if (pm.includes('transfer') || pm.includes('tele') || pm.includes('cbe') || pm.includes('mobile')) return '📲 Transfer';
+                            if (pm === 'split') return '⚡ Split Tender';
+                            return r.payment_method;
+                          })()}</td>
                 <td className="p-2 text-right font-bold">{Number(r.amount || 0).toLocaleString()}</td>
               </tr>
             ))}
