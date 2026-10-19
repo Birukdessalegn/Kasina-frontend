@@ -1,3 +1,4 @@
+import PaymentProofModal from "../../pos/components/PaymentProofModal";
 import DailyZReportModal from "../components/DailyZReportModal";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -67,6 +68,7 @@ function FinanceSalesPage() {
   // Selected Transaction for Modal View
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showZReport, setShowZReport] = useState(false);
+  const [selectedProofOrder, setSelectedProofOrder] = useState(null);
 
   // Fetch Whole Hotel Sales Data (Room Lodging + Restaurant & Bar POS)
   const fetchSalesData = async () => {
@@ -362,6 +364,20 @@ function FinanceSalesPage() {
   };
 
   const formatMoney = (val) => `${Number(val || 0).toLocaleString()} ETB`;
+
+  const hasPaymentProof = (record) => {
+    if (!record) return false;
+    if (record.receipt_image || record.receiptImage || record.image_url || record.imageUrl || record.proof_image || record.proofImage) return true;
+    if (record.raw && (record.raw.receipt_image || record.raw.receiptImage || record.raw.image_url || record.raw.imageUrl || record.raw.proof_image || record.raw.proofImage)) return true;
+    if (Array.isArray(record.payments)) {
+      return record.payments.some((p) => p && (p.receipt_image || p.receiptImage || p.image_url || p.imageUrl));
+    }
+    if (record.raw && Array.isArray(record.raw.payments)) {
+      return record.raw.payments.some((p) => p && (p.receipt_image || p.receiptImage || p.image_url || p.imageUrl));
+    }
+    return false;
+  };
+
 
   const handlePrint = () => {
     window.print();
@@ -849,6 +865,16 @@ function FinanceSalesPage() {
                   {selectedRecord.type === "room" ? "Hotel Room Booking Receipt" : "Restaurant & Bar Bill"}
                 </h3>
               </div>
+              {hasPaymentProof(selectedRecord) && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedProofOrder(selectedRecord.raw || selectedRecord)}
+                  className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  View Payment Proof
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedRecord(null)}
@@ -989,6 +1015,14 @@ function FinanceSalesPage() {
 
       {/* Daily Financial Z-Report Modal */}
       <DailyZReportModal isOpen={showZReport} onClose={() => setShowZReport(false)} />
+
+      {/* Payment Proof Lightbox Modal */}
+      {selectedProofOrder && (
+        <PaymentProofModal
+          order={selectedProofOrder}
+          onClose={() => setSelectedProofOrder(null)}
+        />
+      )}
     </div>
   );
 }
