@@ -64,6 +64,7 @@ import FrontDeskReportsPage from "../modules/frontdesk/pages/FrontDeskReportsPag
 
 import RecipesPage from "../modules/kitchen/pages/RecipesPage";
 import HousekeepingPage from "../modules/housekeeping/pages/HousekeepingPage";
+import HousekeepingReportPage from "../modules/housekeeping/pages/HousekeepingReportPage";
 import PayrollPage from "../modules/employees/pages/PayrollPage";
 import SupervisorHubPage from "../modules/supervisor/pages/SupervisorHubPage";
 

@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
   Sparkles,
+  BarChart3,
   BedDouble,
   CheckCircle2,
   Clock,
@@ -102,6 +104,14 @@ function HousekeepingPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            to="/housekeeping/reports"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition"
+          >
+            <BarChart3 className="h-4 w-4 text-blue-600" />
+            Cross-Check Report
+          </Link>
+
           <button
             onClick={() => handleOpenAssignModal(null)}
             className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-blue-500 transition"
