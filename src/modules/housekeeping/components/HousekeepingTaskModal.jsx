@@ -127,7 +127,7 @@ function HousekeepingTaskModal({ isOpen, onClose, onSuccess, rooms = [], cleaner
               <option value="">-- Unassigned (Any Available Cleaner) --</option>
               {cleaners.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.first_name} {c.last_name} ({c.position_title || "Staff"})
+                  {c.first_name} {c.last_name} ({c.position_title || "Cleaner"})
                 </option>
               ))}
             </select>
