@@ -114,6 +114,7 @@ export default function FrontDeskPage() {
     payment_method: "cash",
     transaction_reference: "",
     notes: "",
+    receipt_image: null,
   });
 
   // Update Check-In / Guest ID Modal (Mobile Friendly)
@@ -696,11 +697,44 @@ export default function FrontDeskPage() {
       payment_method: "cash",
       transaction_reference: "",
       notes: "",
+      receipt_image: null,
     });
     setPaymentModalOpen(true);
   };
 
   // Submit Payment Collection
+  
+  // Camera & Image Capture for Transfer Payment Receipts
+  const handlePaymentProofCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1200;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.7);
+        setPaymentForm((prev) => ({ ...prev, receipt_image: compressed }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleConfirmPayment = async (e) => {
     e.preventDefault();
     if (!selectedPaymentRoom?.current_reservation_id) return;
@@ -716,6 +750,8 @@ export default function FrontDeskPage() {
         payment_method: paymentForm.payment_method,
         transaction_reference: paymentForm.transaction_reference,
         notes: paymentForm.notes,
+        receipt_image: paymentForm.receipt_image,
+        image_url: paymentForm.receipt_image,
       });
       showToast(`Payment of ${payAmt.toLocaleString()} ETB recorded for Room #${selectedPaymentRoom.room_number}!`);
       setPaymentModalOpen(false);
@@ -2840,6 +2876,74 @@ export default function FrontDeskPage() {
                           className="w-full rounded-xl border border-slate-300 p-2.5 text-xs outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                         />
                       </div>
+
+                      {/* Payment Proof / Camera Capture for Digital / Bank Transfers */}
+                      {paymentForm.payment_method !== "cash" && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <Camera size={14} className="text-blue-600" />
+                              Transfer Receipt / Confirmation Photo
+                            </span>
+                            {paymentForm.receipt_image && (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                ✓ Photo Attached
+                              </span>
+                            )}
+                          </label>
+
+                          {paymentForm.receipt_image ? (
+                            <div className="relative rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-2 text-center overflow-hidden">
+                              <img
+                                src={paymentForm.receipt_image}
+                                alt="Payment Receipt Slip"
+                                className="mx-auto max-h-48 rounded-xl object-contain shadow-xs"
+                              />
+                              <div className="mt-2 flex items-center justify-center gap-2">
+                                <label className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer">
+                                  <Camera size={13} />
+                                  Retake Photo
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    onChange={handlePaymentProofCapture}
+                                    className="hidden"
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => setPaymentForm((prev) => ({ ...prev, receipt_image: null }))}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-4 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/30 transition">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-2xs">
+                                <Camera size={20} />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">
+                                  Capture or Upload Transfer Receipt
+                                </p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                  Snap a photo with camera or browse screenshot
+                                </p>
+                              </div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handlePaymentProofCapture}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
 
                       {/* Notes */}
                       <div>

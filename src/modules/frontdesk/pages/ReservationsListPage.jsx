@@ -82,6 +82,7 @@ export default function ReservationsListPage() {
   const [selectedRes, setSelectedRes] = useState(null);
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("cash");
+  const [payProof, setPayProof] = useState(null);
   const [payNotes, setPayNotes] = useState("");
 
   // Update Check-In / Guest ID Modal (Mobile Friendly)
@@ -357,11 +358,41 @@ export default function ReservationsListPage() {
 
   const handleOpenPayment = (res) => {
     setSelectedRes(res);
-    const balance = Number(res.total_amount) - Number(res.paid_amount);
-    setPayAmount(balance > 0 ? String(balance) : "");
+    setPayAmount(String(res.balance || ""));
     setPayMethod("cash");
     setPayNotes("");
+    setPayProof(null);
     setPaymentModalOpen(true);
+  };
+
+  
+  const handleProofCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1200;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        setPayProof(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRecordPayment = async (e) => {
@@ -375,6 +406,8 @@ export default function ReservationsListPage() {
         amount: Number(payAmount),
         payment_method: payMethod,
         notes: payNotes,
+        receipt_image: payProof,
+        image_url: payProof,
       });
       showToast("Payment recorded successfully");
       setPaymentModalOpen(false);
