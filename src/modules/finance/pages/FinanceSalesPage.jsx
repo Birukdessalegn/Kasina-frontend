@@ -986,6 +986,9 @@ function FinanceSalesPage() {
           </div>
         </div>
       )}
+
+      {/* Daily Financial Z-Report Modal */}
+      <DailyZReportModal isOpen={showZReport} onClose={() => setShowZReport(false)} />
     </div>
   );
 }
