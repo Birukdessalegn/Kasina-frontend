@@ -185,6 +185,10 @@ function AppRoutes() {
                 path="/housekeeping"
                 element={<HousekeepingPage />}
               />
+              <Route
+                path="/housekeeping/reports"
+                element={<HousekeepingReportPage />}
+              />
             </Route>
 
             {/* -------------------------
