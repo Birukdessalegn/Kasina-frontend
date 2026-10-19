@@ -9,7 +9,6 @@ import {
   Users,
   Search,
   RefreshCw,
-  Printer,
   Calendar,
   Filter,
   CheckCircle2,
@@ -384,11 +383,6 @@ function FinanceSalesPage() {
     return false;
   };
 
-
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -426,14 +420,6 @@ function FinanceSalesPage() {
           >
             <Receipt className="h-4 w-4" />
             📑 Daily Z-Report
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition"
-          >
-            <Printer className="h-4 w-4" />
-            Print Master Ledger
           </button>
         </div>
       </div>
