@@ -521,7 +521,7 @@ function InventoryPage() {
       <StockThresholdModal
         isOpen={showThresholdModal}
         onClose={() => setShowThresholdModal(false)}
-        onSuccess={loadData}
+        onSuccess={fetchDashboardData}
         product={selectedProductForThreshold}
         initialDepartment="all"
       />
