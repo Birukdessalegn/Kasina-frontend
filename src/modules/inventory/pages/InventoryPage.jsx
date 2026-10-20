@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Package,
   AlertTriangle,
+  SlidersHorizontal,
   TrendingDown,
   Boxes,
   RefreshCw,
@@ -17,6 +18,7 @@ import {
 import { Link } from "react-router-dom";
 import api from "../../../services/api";
 import StockTransferModal from "../components/StockTransferModal";
+import StockThresholdModal from "../components/StockThresholdModal";
 import StoreGoodsReceiptModal from "../components/StoreGoodsReceiptModal";
 
 function InventoryPage() {
@@ -30,6 +32,14 @@ function InventoryPage() {
 
   // Transfer Modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
+  // Stock Threshold Modal state
+  const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [selectedProductForThreshold, setSelectedProductForThreshold] = useState(null);
+
+  const openThresholdModal = (product) => {
+    setSelectedProductForThreshold(product);
+    setShowThresholdModal(true);
+  };
   const [selectedTransferProduct, setSelectedTransferProduct] = useState(null);
   const [selectedTransferDept, setSelectedTransferDept] = useState("bar");
 
@@ -373,12 +383,24 @@ function InventoryPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => openTransferModal(prod, isBarItem ? "bar" : "kitchen")}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-amber-500 hover:bg-amber-50 hover:text-amber-900 transition shadow-2xs"
-                        >
-                          Transfer
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openThresholdModal(prod)}
+                            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 transition shadow-2xs"
+                            title="Set Low Stock Alert Minimum"
+                          >
+                            <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="hidden sm:inline">Set Limit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openTransferModal(prod, isBarItem ? "bar" : "kitchen")}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-amber-500 hover:bg-amber-50 hover:text-amber-900 transition shadow-2xs"
+                          >
+                            Transfer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -493,6 +515,15 @@ function InventoryPage() {
         onSuccess={fetchDashboardData}
         initialProduct={selectedTransferProduct}
         initialDepartment={selectedTransferDept}
+      />
+
+      {/* Stock Threshold Modal */}
+      <StockThresholdModal
+        isOpen={showThresholdModal}
+        onClose={() => setShowThresholdModal(false)}
+        onSuccess={loadData}
+        product={selectedProductForThreshold}
+        initialDepartment="all"
       />
 
       {/* Store Goods Receipt Modal */}

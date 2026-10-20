@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  SlidersHorizontal,
   Search,
   Package,
   ShoppingCart,
@@ -8,6 +9,7 @@ import {
   ArrowDownToLine,
 } from "lucide-react";
 import api from "../../../services/api";
+import StockThresholdModal from "../components/StockThresholdModal";
 
 function InventoryLowStockPage() {
   const [lowStockList, setLowStockList] = useState([]);
@@ -16,6 +18,8 @@ function InventoryLowStockPage() {
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const fetchLowStock = async () => {
     try {
@@ -222,13 +226,24 @@ function InventoryLowStockPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-6 border-t border-slate-100 pt-4 sm:border-t-0 sm:pt-0">
+                <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4 sm:border-t-0 sm:pt-0">
                   <div className="text-right">
                     <p className="text-xs text-slate-400">Stock Status</p>
                     <p className="text-sm font-semibold text-slate-900">
-                      <span className="text-red-600">{item.current}</span> / {item.minimum} {item.unit}
+                      <span className="text-red-600 font-bold">{item.current}</span> / {item.minimum} {item.unit}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedProduct(item);
+                      setShowThresholdModal(true);
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 shadow-2xs transition"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Set Limit</span>
+                  </button>
                 </div>
               </div>
             );
@@ -241,6 +256,14 @@ function InventoryLowStockPage() {
           </div>
         )}
       </div>
+      {/* Stock Threshold Modal */}
+      <StockThresholdModal
+        isOpen={showThresholdModal}
+        onClose={() => setShowThresholdModal(false)}
+        onSuccess={fetchLowStock}
+        product={selectedProduct}
+        initialDepartment="all"
+      />
     </div>
   );
 }
