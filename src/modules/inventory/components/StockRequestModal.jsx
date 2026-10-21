@@ -7,14 +7,20 @@ import {
   Package,
   Plus,
   Minus,
+  Trash2,
   Wine,
   UtensilsCrossed,
   Coffee,
   Clock,
   RefreshCw,
   Layers,
+  Printer,
+  FileText,
+  UserCheck,
+  ShieldCheck,
 } from "lucide-react";
 import api from "../../../services/api";
+import StoreRequisitionVoucherModal from "./StoreRequisitionVoucherModal";
 
 export default function StockRequestModal({
   isOpen,
@@ -27,25 +33,38 @@ export default function StockRequestModal({
   const [activeTab, setActiveTab] = useState("request"); // "request" | "history"
 
   const [productList, setProductList] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [requestNotes, setRequestNotes] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Multi-item requisition items list
+  const [requestItems, setRequestItems] = useState([
+    {
+      id: Date.now(),
+      productId: "",
+      quantity: 1,
+      notes: "",
+    },
+  ]);
+
+  const [voucherNotes, setVoucherNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [newlyCreatedTransfer, setNewlyCreatedTransfer] = useState(null);
 
   // Requisitions history
   const [recentTransfers, setRecentTransfers] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Voucher print modal state
+  const [selectedVoucherForPrint, setSelectedVoucherForPrint] = useState(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
     setError("");
     setSuccessMsg("");
-    setQuantity(1);
-    setRequestNotes("");
+    setNewlyCreatedTransfer(null);
+    setVoucherNotes("");
     setActiveTab("request");
 
     fetchDepartmentProducts();
@@ -91,7 +110,16 @@ export default function StockRequestModal({
           );
         }
 
-        // Default kitchen
+        if (department === "housekeeping") {
+          return (
+            item.department === "housekeeping" ||
+            ["linen", "towel", "soap", "shampoo", "cleaning", "detergent", "sheet", "pillow", "amenity"].some(
+              (k) => cat.includes(k) || name.includes(k)
+            )
+          );
+        }
+
+        // Default kitchen / restaurant
         return (
           item.department === "kitchen" ||
           item.kitchen_quantity !== undefined ||
@@ -104,11 +132,26 @@ export default function StockRequestModal({
       const listToUse = filtered.length > 0 ? filtered : items;
       setProductList(listToUse);
 
+      // Prepopulate first row
       if (initialProduct) {
         const pid = String(initialProduct.product_id || initialProduct.id);
-        setSelectedProductId(pid);
+        setRequestItems([
+          {
+            id: Date.now(),
+            productId: pid,
+            quantity: 1,
+            notes: "",
+          },
+        ]);
       } else if (listToUse.length > 0) {
-        setSelectedProductId(String(listToUse[0].product_id || listToUse[0].id));
+        setRequestItems([
+          {
+            id: Date.now(),
+            productId: String(listToUse[0].product_id || listToUse[0].id),
+            quantity: 1,
+            notes: "",
+          },
+        ]);
       }
     } catch (err) {
       console.error("Failed to load products for stock request:", err);
@@ -120,7 +163,7 @@ export default function StockRequestModal({
   const fetchRecentTransfers = async () => {
     try {
       setLoadingHistory(true);
-      const res = await api(`/inventory/transfers?toLocation=${department}&limit=10`);
+      const res = await api(`/inventory/transfers?toLocation=${department}&limit=15`);
       const list = res.transfers || res.data || (Array.isArray(res) ? res : []);
       setRecentTransfers(list);
     } catch (err) {
@@ -132,24 +175,49 @@ export default function StockRequestModal({
 
   if (!isOpen) return null;
 
-  const matchedProduct = productList.find(
-    (p) => String(p.product_id || p.id) === String(selectedProductId)
-  );
+  // Add a new row to the multi-item table
+  const handleAddRow = () => {
+    const defaultProdId = productList.length > 0 ? String(productList[0].product_id || productList[0].id) : "";
+    setRequestItems((prev) => [
+      ...prev,
+      {
+        id: Date.now() + Math.random(),
+        productId: defaultProdId,
+        quantity: 1,
+        notes: "",
+      },
+    ]);
+  };
 
-  const productName =
-    matchedProduct?.product_name ||
-    matchedProduct?.name ||
-    initialProduct?.product_name ||
-    initialProduct?.name ||
-    "Selected Item";
+  // Remove a row
+  const handleRemoveRow = (rowId) => {
+    if (requestItems.length <= 1) return;
+    setRequestItems((prev) => prev.filter((it) => it.id !== rowId));
+  };
 
-  const unit =
-    matchedProduct?.unit ||
-    initialProduct?.unit ||
-    (department === "bar" ? "bottle" : department === "barista" ? "liter/kg" : "unit");
+  // Update a field in a specific row
+  const handleUpdateRow = (rowId, field, value) => {
+    setRequestItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== rowId) return it;
+        if (field === "quantity") {
+          const val = Math.max(1, Number(value) || 1);
+          return { ...it, quantity: val };
+        }
+        return { ...it, [field]: value };
+      })
+    );
+  };
 
-  const handleAdjust = (delta) => {
-    setQuantity((prev) => Math.max(1, Number(prev || 0) + delta));
+  // Stepper increment/decrement
+  const handleStepQty = (rowId, delta) => {
+    setRequestItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== rowId) return it;
+        const newQty = Math.max(1, Number(it.quantity || 1) + delta);
+        return { ...it, quantity: newQty };
+      })
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -157,17 +225,33 @@ export default function StockRequestModal({
     setError("");
     setSuccessMsg("");
 
-    const reqQty = Number(quantity);
-    const prodId = Number(selectedProductId || initialProduct?.product_id || initialProduct?.id);
-
-    if (!prodId) {
-      setError("Please select an item to request.");
+    // Validate items
+    if (!requestItems || requestItems.length === 0) {
+      setError("Please add at least one item to the requisition.");
       return;
     }
 
-    if (isNaN(reqQty) || reqQty <= 0) {
-      setError("Please enter a valid quantity (minimum 1).");
-      return;
+    const payloadItems = [];
+    for (let i = 0; i < requestItems.length; i++) {
+      const it = requestItems[i];
+      const prodId = Number(it.productId);
+      const qty = Number(it.quantity);
+
+      if (!prodId) {
+        setError(`Item row #${i + 1} does not have a product selected.`);
+        return;
+      }
+
+      if (isNaN(qty) || qty <= 0) {
+        setError(`Item row #${i + 1} must have a quantity of at least 1.`);
+        return;
+      }
+
+      payloadItems.push({
+        productId: prodId,
+        quantity: qty,
+        notes: it.notes ? it.notes.trim() : null,
+      });
     }
 
     try {
@@ -175,14 +259,8 @@ export default function StockRequestModal({
 
       const payload = {
         toLocation: department.toLowerCase(),
-        items: [
-          {
-            productId: prodId,
-            quantity: reqQty,
-            notes: requestNotes.trim() || `Restock request from ${department.toUpperCase()}`,
-          },
-        ],
-        notes: requestNotes.trim() || `Restock request for ${productName} (${department.toUpperCase()})`,
+        items: payloadItems,
+        notes: voucherNotes.trim() || undefined,
       };
 
       const res = await api("/inventory/transfers/request", {
@@ -190,377 +268,507 @@ export default function StockRequestModal({
         body: JSON.stringify(payload),
       });
 
-      setSuccessMsg(`Requested ${reqQty} ${unit}(s) of ${productName}!`);
+      const created = res.data || res.transfer || res;
+      setNewlyCreatedTransfer(created);
 
-      await fetchRecentTransfers();
+      setSuccessMsg(
+        `Store Requisition Voucher (${created.transfer_number || "REQ"}) submitted! Notification sent to F&B Manager for verification.`
+      );
 
-      setTimeout(() => {
-        if (onSuccess) onSuccess(res.data);
-        setActiveTab("history");
-        setSuccessMsg("");
-      }, 1000);
+      fetchRecentTransfers();
+
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       console.error("Stock request failed:", err);
-      setError(err.message || "Failed to submit stock request.");
+      setError(err.message || "Failed to submit store requisition.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const isBar = department === "bar";
-  const isBarista = department === "barista";
-  const isCafe = department === "cafe";
+  const getDepartmentIcon = () => {
+    if (department === "bar") return <Wine className="h-5 w-5 text-purple-600" />;
+    if (department === "barista") return <Coffee className="h-5 w-5 text-amber-600" />;
+    if (department === "cafe") return <Coffee className="h-5 w-5 text-emerald-600" />;
+    return <UtensilsCrossed className="h-5 w-5 text-orange-600" />;
+  };
 
-  const stationTitle = isBarista
-    ? "Barista Coffee Station"
-    : isBar
-    ? "Bar & Lounge"
-    : isCafe
-    ? "Cafe Kitchen"
-    : "Kitchen Station";
+  const totalVoucherQty = requestItems.reduce(
+    (sum, it) => sum + (Number(it.quantity) || 0),
+    0
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
-        {/* MODAL HEADER */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90">
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-xs ${
-                isBarista
-                  ? "bg-amber-700"
-                  : isBar
-                  ? "bg-purple-600"
-                  : isCafe
-                  ? "bg-orange-500"
-                  : "bg-amber-600"
-              }`}
-            >
-              {isBarista ? (
-                <Coffee className="h-5 w-5" />
-              ) : isBar ? (
-                <Wine className="h-5 w-5" />
-              ) : (
-                <UtensilsCrossed className="h-5 w-5" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 leading-tight">
-                {stationTitle} Stock Request
-              </h3>
-              <p className="text-[11px] font-semibold text-slate-500">
-                Requisition from Central Warehouse / Main Store
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* TABS (Request vs History) */}
-        <div className="flex border-b border-slate-100 bg-slate-50/50 px-6 pt-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("request")}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition cursor-pointer ${
-              activeTab === "request"
-                ? isBarista
-                  ? "border-amber-700 text-amber-900"
-                  : isBar
-                  ? "border-purple-600 text-purple-900"
-                  : "border-amber-600 text-amber-900"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            New Stock Request
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-1.5 pb-2.5 px-3 text-xs font-bold border-b-2 transition cursor-pointer ${
-              activeTab === "history"
-                ? isBarista
-                  ? "border-amber-700 text-amber-900"
-                  : isBar
-                  ? "border-purple-600 text-purple-900"
-                  : "border-amber-600 text-amber-900"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>Recent Requests</span>
-            {recentTransfers.length > 0 && (
-              <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] font-extrabold text-slate-700">
-                {recentTransfers.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* MODAL BODY */}
-        {activeTab === "request" ? (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* CONFIRMATION PROMPT */}
-            <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-xs font-bold text-amber-900">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-              <span>Submit request to storekeeper to replenish stock items.</span>
-            </div>
-
-            {/* ERROR ALERT */}
-            {error && (
-              <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold text-rose-700">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+        <div className="relative w-full max-w-4xl my-6 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-white shadow-sm border border-slate-200">
+                {getDepartmentIcon()}
               </div>
-            )}
-
-            {/* SUCCESS ALERT */}
-            {successMsg && (
-              <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 animate-in fade-in">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
-            {/* ITEM NAME */}
-            <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Item to Request
-              </label>
-              {initialProduct ? (
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 shrink-0">
-                    <Package className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-black text-slate-900 truncate">{productName}</h4>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase">
-                      Stock Unit: {unit}
-                    </p>
-                  </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Store Requisition Voucher
+                  </h2>
+                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    {department}
+                  </span>
                 </div>
-              ) : (
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  disabled={loadingProducts}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-amber-500 focus:bg-white"
-                >
-                  {productList.length === 0 ? (
-                    <option value="">Loading available items...</option>
-                  ) : (
-                    productList.map((p) => {
-                      const id = p.product_id || p.id;
-                      const name = p.product_name || p.name;
-                      const u = p.unit || "unit";
-                      return (
-                        <option key={id} value={id}>
-                          {name} ({u})
-                        </option>
-                      );
-                    })
-                  )}
-                </select>
-              )}
-            </div>
-
-            {/* QUANTITY INPUT */}
-            <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Quantity to Request ({unit})
-              </label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleAdjust(-1)}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 py-2.5 text-center text-lg font-black text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white"
-                  required
-                />
-
-                <button
-                  type="button"
-                  onClick={() => handleAdjust(1)}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* QUICK PRESETS */}
-              <div className="mt-2.5 flex items-center justify-center gap-2">
-                {[1, 2, 5, 10, 20].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setQuantity(preset)}
-                    className={`rounded-xl px-3 py-1 text-xs font-black border transition cursor-pointer ${
-                      Number(quantity) === preset
-                        ? isBarista
-                          ? "border-amber-700 bg-amber-700 text-white"
-                          : isBar
-                          ? "border-purple-600 bg-purple-600 text-white"
-                          : "border-amber-600 bg-amber-600 text-white"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    +{preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* NOTES / REASON */}
-            <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Note / Reason (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Running out during breakfast rush..."
-                value={requestNotes}
-                onChange={(e) => setRequestNotes(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-amber-500 focus:bg-white"
-              />
-            </div>
-
-            {/* MODAL FOOTER */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={submitting}
-                className="rounded-2xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={submitting || !!successMsg}
-                className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white shadow-md active:scale-95 transition cursor-pointer disabled:opacity-50 ${
-                  isBarista
-                    ? "bg-amber-700 hover:bg-amber-800 shadow-amber-700/20"
-                    : isBar
-                    ? "bg-purple-600 hover:bg-purple-700 shadow-purple-600/20"
-                    : "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
-                }`}
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>{submitting ? "Sending..." : "Submit Requisition"}</span>
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* REQUISITIONS HISTORY TAB */
-          <div className="p-6 space-y-4 max-h-[460px] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-slate-500">
-                Recent requisitions from {stationTitle}:
-              </p>
-              <button
-                type="button"
-                onClick={fetchRecentTransfers}
-                className="flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-slate-900 transition"
-              >
-                <RefreshCw className={`h-3 w-3 ${loadingHistory ? "animate-spin" : ""}`} />
-                <span>Refresh</span>
-              </button>
-            </div>
-
-            {loadingHistory ? (
-              <div className="p-8 text-center text-xs font-semibold text-slate-400">
-                Loading requisitions...
-              </div>
-            ) : recentTransfers.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
-                <Layers className="h-6 w-6 text-slate-300 mx-auto mb-2" />
-                <p className="text-xs font-bold text-slate-600">No requisitions yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Submit a new stock request to see it tracked here.
+                <p className="text-xs text-slate-500">
+                  Request multiple stock items simultaneously from Central Store with 2-stage F&B and Storekeeper approval
                 </p>
               </div>
-            ) : (
-              <div className="space-y-2.5">
-                {recentTransfers.map((req) => {
-                  const status = (req.status || "pending").toLowerCase();
-                  const isCompleted = status === "completed";
-                  const isRejected = status === "rejected";
+            </div>
 
-                  return (
-                    <div
-                      key={req.id}
-                      className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs transition hover:border-slate-300"
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              title="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-200 bg-white">
+            <button
+              onClick={() => setActiveTab("request")}
+              className={`flex items-center gap-2 pb-3 text-xs font-semibold border-b-2 transition ${
+                activeTab === "request"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              <span>New Store Requisition Voucher</span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {requestItems.length} {requestItems.length === 1 ? "item" : "items"}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center gap-2 pb-3 text-xs font-semibold border-b-2 transition ${
+                activeTab === "history"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              <span>Requisition History</span>
+              {recentTransfers.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">
+                  {recentTransfers.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-6 overflow-y-auto space-y-5 flex-1">
+            {error && (
+              <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs animate-shake">
+                <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium">{error}</div>
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="flex items-center justify-between gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">{successMsg}</span>
+                </div>
+                {newlyCreatedTransfer && (
+                  <button
+                    onClick={() => setSelectedVoucherForPrint(newlyCreatedTransfer)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-sm transition shrink-0"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>View / Print Voucher</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* TAB 1: NEW VOUCHER FORM */}
+            {activeTab === "request" && (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Department & Requisition Overview Header */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 p-3.5 rounded-xl text-xs">
+                  <div>
+                    <span className="text-slate-500 text-[10px] uppercase font-semibold block">
+                      Requesting Section
+                    </span>
+                    <span className="font-bold text-slate-800 capitalize">
+                      {department} Department
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px] uppercase font-semibold block">
+                      Source Warehouse
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      Central Store (Main Warehouse)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px] uppercase font-semibold block">
+                      Approval Stages
+                    </span>
+                    <span className="font-semibold text-indigo-700">
+                      1. F&B Check &rarr; 2. Storekeeper Issue
+                    </span>
+                  </div>
+                </div>
+
+                {/* Multi-Item Requisition Table */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-indigo-600" />
+                      <span>Requested Items List</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500">
+                      Total: <strong className="text-slate-900">{requestItems.length}</strong> items &bull;{" "}
+                      <strong className="text-indigo-600">{totalVoucherQty}</strong> units
+                    </span>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase text-[11px]">
+                          <th className="py-2.5 px-3 w-10 text-center">#</th>
+                          <th className="py-2.5 px-3">Item Description</th>
+                          <th className="py-2.5 px-2 w-20 text-center">Unit</th>
+                          <th className="py-2.5 px-3 w-36 text-center">Quantity</th>
+                          <th className="py-2.5 px-3">Item Remark</th>
+                          <th className="py-2.5 px-2 w-10 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {requestItems.map((row, index) => {
+                          const matched = productList.find(
+                            (p) => String(p.product_id || p.id) === String(row.productId)
+                          );
+                          const unit = matched?.unit || "pcs";
+                          const storeStock =
+                            matched?.main_quantity !== undefined
+                              ? matched.main_quantity
+                              : matched?.quantity !== undefined
+                              ? matched.quantity
+                              : null;
+
+                          return (
+                            <tr key={row.id} className="hover:bg-slate-50/70 transition">
+                              <td className="py-2.5 px-3 text-center font-mono font-medium text-slate-500">
+                                {index + 1}
+                              </td>
+
+                              <td className="py-2 px-3">
+                                <select
+                                  value={row.productId}
+                                  onChange={(e) =>
+                                    handleUpdateRow(row.id, "productId", e.target.value)
+                                  }
+                                  disabled={loadingProducts}
+                                  className="w-full px-2.5 py-1.5 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                >
+                                  {productList.length === 0 ? (
+                                    <option value="">No items found</option>
+                                  ) : (
+                                    productList.map((p) => {
+                                      const pId = String(p.product_id || p.id);
+                                      const pName = p.product_name || p.name;
+                                      const pCat = p.category || p.category_name;
+                                      return (
+                                        <option key={pId} value={pId}>
+                                          {pName} {pCat ? `(${pCat})` : ""}
+                                        </option>
+                                      );
+                                    })
+                                  )}
+                                </select>
+                                {storeStock !== null && (
+                                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                                    Central Store Stock: <strong className="text-slate-600">{storeStock} {unit}</strong>
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="py-2 px-2 text-center text-[11px] font-semibold text-slate-600 uppercase">
+                                {unit}
+                              </td>
+
+                              <td className="py-2 px-3">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStepQty(row.id, -1)}
+                                    className="p-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={row.quantity}
+                                    onChange={(e) =>
+                                      handleUpdateRow(row.id, "quantity", e.target.value)
+                                    }
+                                    className="w-14 text-center font-mono font-bold text-slate-900 text-xs py-1 px-1 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStepQty(row.id, 1)}
+                                    className="p-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </td>
+
+                              <td className="py-2 px-3">
+                                <input
+                                  type="text"
+                                  value={row.notes}
+                                  placeholder="e.g. VIP event / daily prep"
+                                  onChange={(e) =>
+                                    handleUpdateRow(row.id, "notes", e.target.value)
+                                  }
+                                  className="w-full text-xs text-slate-700 py-1.5 px-2 border border-slate-200 rounded-lg placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                />
+                              </td>
+
+                              <td className="py-2 px-2 text-center">
+                                {requestItems.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRow(row.id)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                                    title="Remove row"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Add Row Button */}
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAddRow}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-900">
-                          {req.transfer_number}
-                        </span>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider border ${
-                            isCompleted
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : isRejected
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse"
-                          }`}
+                      <Plus className="h-4 w-4" />
+                      <span>Add Another Item Row</span>
+                    </button>
+
+                    <span className="text-[11px] text-slate-400 italic">
+                      * Auto-generates official Store Requisition Voucher ID
+                    </span>
+                  </div>
+                </div>
+
+                {/* Overall Voucher Notes / Reason */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Voucher Reason / General Remarks (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={voucherNotes}
+                    onChange={(e) => setVoucherNotes(e.target.value)}
+                    placeholder="e.g. Restock for upcoming weekend rush / depleted stock replenishment"
+                    className="w-full text-xs text-slate-800 p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-slate-400"
+                  />
+                </div>
+
+                {/* Submit Action */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-100 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || productList.length === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" />
+                    <span>
+                      {submitting
+                        ? "Submitting Voucher..."
+                        : `Submit Voucher (${requestItems.length} items)`}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 2: VOUCHER HISTORY */}
+            {activeTab === "history" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <h3 className="text-xs font-bold text-slate-800">
+                    Recent Requisitions for {department.toUpperCase()}
+                  </h3>
+                  <button
+                    onClick={fetchRecentTransfers}
+                    disabled={loadingHistory}
+                    className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${loadingHistory ? "animate-spin" : ""}`} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+
+                {loadingHistory ? (
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    Loading requisition vouchers...
+                  </div>
+                ) : recentTransfers.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    No recent store requisitions found for this section.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {recentTransfers.map((req) => {
+                      const reqStatus = (req.status || "").toLowerCase();
+                      const isPendingFB = reqStatus === "pending_fb" || reqStatus === "pending";
+                      const isPendingStore = reqStatus === "pending_store";
+                      const isCompleted = reqStatus === "completed";
+                      const isRejected = reqStatus === "rejected" || reqStatus === "cancelled";
+
+                      const itemsList = Array.isArray(req.items) ? req.items : [];
+
+                      return (
+                        <div
+                          key={req.id}
+                          className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm hover:border-slate-300 transition space-y-2"
                         >
-                          {isCompleted
-                            ? "✓ Restocked"
-                            : isRejected
-                            ? "✕ Rejected"
-                            : "● Pending Store Dispatch"}
-                        </span>
-                      </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900 text-xs">
+                                {req.transfer_number}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
+                                  isCompleted
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                    : isPendingStore
+                                    ? "bg-blue-100 text-blue-800 border border-blue-300"
+                                    : isRejected
+                                    ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                    : "bg-amber-100 text-amber-800 border border-amber-300"
+                                }`}
+                              >
+                                {isCompleted
+                                  ? "Approved & Issued"
+                                  : isPendingStore
+                                  ? "Checked by F&B (Awaiting Store)"
+                                  : isRejected
+                                  ? "Rejected"
+                                  : "Awaiting F&B Check"}
+                              </span>
+                            </div>
 
-                      {/* Items */}
-                      <div className="mt-2 text-xs font-bold text-slate-700">
-                        {req.items && req.items.length > 0 ? (
-                          req.items.map((it, idx) => (
-                            <span key={idx} className="mr-2 inline-block bg-slate-100 rounded-lg px-2 py-0.5 text-[11px]">
-                              {it.quantity}x {it.product_name || `Item #${it.product_id}`} ({it.unit || "unit"})
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-slate-500">
-                            {req.total_quantity || 1} unit(s) requested
-                          </span>
-                        )}
-                      </div>
+                            <button
+                              onClick={() => setSelectedVoucherForPrint(req)}
+                              className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 transition border border-slate-200"
+                            >
+                              <Printer className="h-3 w-3" />
+                              <span>View / Print Voucher</span>
+                            </button>
+                          </div>
 
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-1.5">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{new Date(req.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                          {/* Items summary */}
+                          <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">
+                            {itemsList.length === 0 ? (
+                              <span>Requisition details</span>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {itemsList.slice(0, 3).map((it, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between text-[11px]"
+                                  >
+                                    <span className="font-medium text-slate-800">
+                                      &bull; {it.product_name || `Item #${it.product_id}`}
+                                    </span>
+                                    <span className="font-mono font-bold text-indigo-700">
+                                      {it.quantity} {it.unit || "pcs"}
+                                    </span>
+                                  </div>
+                                ))}
+                                {itemsList.length > 3 && (
+                                  <span className="text-[10px] text-slate-400 italic block">
+                                    + {itemsList.length - 3} more items...
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3 Actors Status Bar */}
+                          <div className="grid grid-cols-3 gap-2 pt-1 text-[10px] text-slate-500 border-t border-slate-100">
+                            <div>
+                              <span className="font-semibold text-slate-700">Requested: </span>
+                              {req.requested_by_username || "Staff"}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-700">F&B Check: </span>
+                              {req.checked_at ? (
+                                <span className="text-blue-700 font-medium">Verified</span>
+                              ) : (
+                                <span className="text-amber-600">Pending</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-700">Store Issue: </span>
+                              {isCompleted ? (
+                                <span className="text-emerald-700 font-medium">Issued</span>
+                              ) : isRejected ? (
+                                <span className="text-rose-700 font-medium">Declined</span>
+                              ) : (
+                                <span className="text-slate-400">Pending</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        {req.requested_by_username && (
-                          <span>Requested by @{req.requested_by_username}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
+
+      {/* View / Print Voucher Modal */}
+      {selectedVoucherForPrint && (
+        <StoreRequisitionVoucherModal
+          isOpen={!!selectedVoucherForPrint}
+          onClose={() => setSelectedVoucherForPrint(null)}
+          transfer={selectedVoucherForPrint}
+        />
+      )}
+    </>
   );
 }

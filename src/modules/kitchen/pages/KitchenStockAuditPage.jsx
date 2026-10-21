@@ -24,6 +24,7 @@ import {
   FileText,
 } from "lucide-react";
 import api from "../../../services/api";
+import StoreRequisitionVoucherModal from "../../inventory/components/StoreRequisitionVoucherModal";
 import { printReportArea } from "../../../utils/printHelper";
 
 // Robust image resolution helper for uploaded or absolute image URLs
@@ -78,6 +79,7 @@ export default function KitchenStockAuditPage() {
   const [depletionModalItem, setDepletionModalItem] = useState(null);
   const [stockFoundModalItem, setStockFoundModalItem] = useState(null);
   const [rejectReqItem, setRejectReqItem] = useState(null);
+  const [voucherModalTransfer, setVoucherModalTransfer] = useState(null);
   const [submittingAction, setSubmittingAction] = useState(false);
 
   // Form states for modals
@@ -453,6 +455,26 @@ export default function KitchenStockAuditPage() {
       await loadData(true);
     } catch (err) {
       alert(err.message || "Failed to restore stock.");
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+    // F&B Check / Verify Requisition
+  const handleCheckRequisition = async (transferId, destLocation) => {
+    try {
+      setSubmittingAction(true);
+      await api(`/inventory/transfers/${transferId}/check`, {
+        method: "PUT",
+        body: JSON.stringify({
+          notes: `Verified by F&B Controller for ${destLocation.toUpperCase()}`,
+        }),
+      });
+
+      triggerToast(`Requisition verified by F&B and forwarded to Storekeeper for stock issuance.`);
+      await loadData(true);
+    } catch (err) {
+      alert(err.message || "Failed to check requisition.");
     } finally {
       setSubmittingAction(false);
     }
@@ -1137,31 +1159,47 @@ export default function KitchenStockAuditPage() {
                           </p>
                         </div>
 
-                        {/* Action buttons if pending */}
-                        {isPending && (
-                          <div className="flex items-center gap-2 self-end sm:self-auto">
-                            <button
-                              onClick={() => handleApproveRequisition(req.id, req.to_location)}
-                              disabled={submittingAction}
-                              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition disabled:opacity-50"
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                              <span>Approve & Release to {isBar ? "Bar" : "Kitchen"}</span>
-                            </button>
+                        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+                          <button
+                            onClick={() => setVoucherModalTransfer(req)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 transition"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            <span>View / Print Voucher</span>
+                          </button>
 
-                            <button
-                              onClick={() => {
-                                setRejectReqItem(req);
-                                setRejectionReason("");
-                              }}
-                              disabled={submittingAction}
-                              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition disabled:opacity-50"
-                            >
-                              <XCircle className="h-4 w-4" />
-                              <span>Reject</span>
-                            </button>
-                          </div>
-                        )}
+                          {(req.status === 'pending_fb' || req.status === 'pending') && (
+                            <>
+                              <button
+                                onClick={() => handleCheckRequisition(req.id, req.to_location)}
+                                disabled={submittingAction}
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition disabled:opacity-50"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span>Check & Forward to Store</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setRejectReqItem(req);
+                                  setRejectionReason("");
+                                }}
+                                disabled={submittingAction}
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition disabled:opacity-50"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                <span>Reject</span>
+                              </button>
+                            </>
+                          )}
+
+                          {req.status === 'pending_store' && (
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
+                              <Clock className="h-3.5 w-3.5 text-blue-600" />
+                              <span>Checked by F&B - Awaiting Storekeeper</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Items requested */}
