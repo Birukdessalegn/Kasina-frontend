@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   X,
   Printer,
@@ -9,16 +9,47 @@ import {
   UserCheck,
   ShieldCheck,
   Building2,
+  Loader2,
 } from "lucide-react";
+import api from "../../../services/api";
 
 export default function StoreRequisitionVoucherModal({
   isOpen,
   onClose,
-  transfer,
+  transfer: initialTransfer,
 }) {
   const printRef = useRef(null);
+  const [activeTransfer, setActiveTransfer] = useState(initialTransfer);
+  const [loadingItems, setLoadingItems] = useState(false);
 
-  if (!isOpen || !transfer) return null;
+  useEffect(() => {
+    setActiveTransfer(initialTransfer);
+    if (!initialTransfer?.id) return;
+
+    if (!initialTransfer.items || !Array.isArray(initialTransfer.items) || initialTransfer.items.length === 0) {
+      setLoadingItems(true);
+      api(`/inventory/transfers/${initialTransfer.id}`)
+        .then((res) => {
+          const full = res.transfer || res.data || res;
+          if (full) {
+            setActiveTransfer((prev) => ({
+              ...prev,
+              ...full,
+              items: Array.isArray(full.items) ? full.items : prev?.items || [],
+            }));
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch full transfer items:", err);
+        })
+        .finally(() => {
+          setLoadingItems(false);
+        });
+    }
+  }, [initialTransfer]);
+
+  if (!isOpen || !activeTransfer) return null;
+  const transfer = activeTransfer;
 
   const handlePrint = () => {
     const printContent = printRef.current;

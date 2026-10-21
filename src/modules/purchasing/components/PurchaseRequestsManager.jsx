@@ -573,7 +573,17 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
 
                           {/* Print Voucher Action */}
                           <button
-                            onClick={() => setSelectedVoucherForPrint(req)}
+                            onClick={async () => {
+                              setSelectedVoucherForPrint(req);
+                              try {
+                                const res = await api(`/purchasing/requests/${req.id}`);
+                                if (res.request || res.data) {
+                                  setSelectedVoucherForPrint(res.request || res.data);
+                                }
+                              } catch(e) {
+                                console.error("Error fetching voucher data:", e);
+                              }
+                            }}
                             className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition"
                             title="View / Print Voucher"
                           >

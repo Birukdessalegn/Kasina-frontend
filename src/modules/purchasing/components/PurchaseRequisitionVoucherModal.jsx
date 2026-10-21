@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   X,
   Printer,
@@ -11,16 +11,47 @@ import {
   Building2,
   DollarSign,
   Wallet,
+  Loader2,
 } from "lucide-react";
+import api from "../../../services/api";
 
 export default function PurchaseRequisitionVoucherModal({
   isOpen,
   onClose,
-  request,
+  request: initialRequest,
 }) {
   const printRef = useRef(null);
+  const [activeRequest, setActiveRequest] = useState(initialRequest);
+  const [loadingItems, setLoadingItems] = useState(false);
 
-  if (!isOpen || !request) return null;
+  useEffect(() => {
+    setActiveRequest(initialRequest);
+    if (!initialRequest?.id) return;
+
+    if (!initialRequest.items || !Array.isArray(initialRequest.items) || initialRequest.items.length === 0) {
+      setLoadingItems(true);
+      api(`/purchasing/requests/${initialRequest.id}`)
+        .then((res) => {
+          const full = res.request || res.data || res;
+          if (full) {
+            setActiveRequest((prev) => ({
+              ...prev,
+              ...full,
+              items: Array.isArray(full.items) ? full.items : prev?.items || [],
+            }));
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch full purchase request items:", err);
+        })
+        .finally(() => {
+          setLoadingItems(false);
+        });
+    }
+  }, [initialRequest]);
+
+  if (!isOpen || !activeRequest) return null;
+  const request = activeRequest;
 
   const handlePrint = () => {
     const printContent = printRef.current;
