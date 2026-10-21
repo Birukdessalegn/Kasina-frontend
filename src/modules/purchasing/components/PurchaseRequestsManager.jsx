@@ -20,8 +20,11 @@ import {
   Send,
   ShoppingCart,
   Loader2,
+  Printer,
+  Wallet,
 } from "lucide-react";
 import api from "../../../services/api";
+import PurchaseRequisitionVoucherModal from "./PurchaseRequisitionVoucherModal";
 
 export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreated }) {
   const [requests, setRequests] = useState([]);
@@ -52,8 +55,11 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
     departmentId: "",
     outletId: "",
     priority: "normal",
+    purpose: "",
+    projectName: "",
+    enclosure: "",
     notes: "",
-    items: [{ productId: "", quantity: 1, estimatedPrice: "", notes: "" }],
+    items: [{ productId: "", itemName: "", quantity: 1, unit: "pcs", estimatedPrice: "", notes: "" }],
   });
 
   // Review State
@@ -64,6 +70,10 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
   // Convert State
   const [convertSupplierId, setConvertSupplierId] = useState("");
   const [converting, setConverting] = useState(false);
+  const [selectedVoucherForPrint, setSelectedVoucherForPrint] = useState(null);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [budgetIsAllocated, setBudgetIsAllocated] = useState(true);
+  const [budgetNotes, setBudgetNotes] = useState("");
 
   const loadRequests = async () => {
     try {
@@ -123,8 +133,11 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
       departmentId: "",
       outletId: "",
       priority: "normal",
+      purpose: "",
+      projectName: "",
+      enclosure: "",
       notes: "",
-      items: [{ productId: "", quantity: 1, estimatedPrice: "", notes: "" }],
+      items: [{ productId: "", itemName: "", quantity: 1, unit: "pcs", estimatedPrice: "", notes: "" }],
     });
     setShowCreateModal(true);
   };
@@ -132,7 +145,7 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
   const handleAddItem = () => {
     setCreateForm((prev) => ({
       ...prev,
-      items: [...prev.items, { productId: "", quantity: 1, estimatedPrice: "", notes: "" }],
+      items: [...prev.items, { productId: "", itemName: "", quantity: 1, unit: "pcs", estimatedPrice: "", notes: "" }],
     }));
   };
 
@@ -198,6 +211,62 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
       alert(err.message || "Failed to submit purchase request");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  
+  const handleCheck = async (reqId) => {
+    try {
+      setReviewing(true);
+      await api(`/purchasing/requests/${reqId}/check`, {
+        method: "PUT",
+        body: JSON.stringify({ notes: "Checked & verified by F&B / Supervisor" }),
+      });
+      alert("Purchase requisition checked and forwarded for budget verification!");
+      await loadRequests();
+    } catch (err) {
+      alert(err.message || "Failed to check requisition");
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const handleVerifyBudgetSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedRequest) return;
+    try {
+      setReviewing(true);
+      await api(`/purchasing/requests/${selectedRequest.id}/budget-verify`, {
+        method: "PUT",
+        body: JSON.stringify({
+          isBudgeted: budgetIsAllocated,
+          notes: budgetNotes,
+        }),
+      });
+      setShowBudgetModal(false);
+      setBudgetNotes("");
+      alert("Budget allocation verified and forwarded for General Manager approval!");
+      await loadRequests();
+    } catch (err) {
+      alert(err.message || "Failed to verify budget");
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const handleApprove = async (reqId) => {
+    try {
+      setReviewing(true);
+      await api(`/purchasing/requests/${reqId}/approve`, {
+        method: "PUT",
+        body: JSON.stringify({ notes: "Approved by General Manager" }),
+      });
+      alert("Purchase requisition approved successfully!");
+      await loadRequests();
+    } catch (err) {
+      alert(err.message || "Failed to approve requisition");
+    } finally {
+      setReviewing(false);
     }
   };
 
@@ -502,16 +571,63 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
                             <Eye size={14} />
                           </button>
 
-                          {status === "pending" && (
+                          {/* Print Voucher Action */}
+                          <button
+                            onClick={() => setSelectedVoucherForPrint(req)}
+                            className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                            title="View / Print Voucher"
+                          >
+                            <Printer size={14} />
+                          </button>
+
+                          {(status === "pending" || status === "pending_check") && (
+                            <button
+                              onClick={() => handleCheck(req.id)}
+                              disabled={reviewing}
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-200 hover:bg-blue-100 transition text-[11px]"
+                              title="Check and verify requisition"
+                            >
+                              Check
+                            </button>
+                          )}
+
+                          {status === "pending_finance" && (
                             <button
                               onClick={() => {
                                 setSelectedRequest(req);
-                                setReviewAction("approved");
+                                setBudgetIsAllocated(true);
+                                setBudgetNotes("");
+                                setShowBudgetModal(true);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 font-bold border border-amber-200 hover:bg-amber-100 transition text-[11px]"
+                              title="Verify budget allocation"
+                            >
+                              Verify Budget
+                            </button>
+                          )}
+
+                          {status === "pending_approval" && (
+                            <button
+                              onClick={() => handleApprove(req.id)}
+                              disabled={reviewing}
+                              className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-800 font-bold border border-purple-200 hover:bg-purple-100 transition text-[11px]"
+                              title="Final General Manager Approval"
+                            >
+                              Approve
+                            </button>
+                          )}
+
+                          {["pending", "pending_check", "pending_finance", "pending_approval"].includes(status) && (
+                            <button
+                              onClick={() => {
+                                setSelectedRequest(req);
+                                setReviewAction("rejected");
                                 setShowReviewModal(true);
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-200 hover:bg-blue-100 transition"
+                              className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 hover:bg-rose-100 transition text-[11px]"
+                              title="Reject requisition"
                             >
-                              Review
+                              Reject
                             </button>
                           )}
 
@@ -522,7 +638,7 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
                                 setConvertSupplierId(suppliers[0]?.id ? String(suppliers[0].id) : "");
                                 setShowConvertModal(true);
                               }}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition"
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition text-[11px]"
                             >
                               <ShoppingCart size={13} />
                               <span>Create PO</span>
@@ -559,6 +675,31 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
             </div>
 
             <form onSubmit={handleCreateSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Purpose / Reason (Required)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Weekly restaurant kitchen replenishment / VIP banquet supplies"
+                    value={createForm.purpose}
+                    onChange={(e) => setCreateForm({ ...createForm, purpose: e.target.value })}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs bg-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Project Name (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Hotel Operations / Banquet"
+                    value={createForm.projectName}
+                    onChange={(e) => setCreateForm({ ...createForm, projectName: e.target.value })}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs bg-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Requesting Dept</label>
@@ -913,6 +1054,97 @@ export default function PurchaseRequestsManager({ onConvertToPO, onRequestCreate
             </form>
           </div>
         </div>
+      )}
+
+      {/* BUDGET VERIFICATION MODAL (FINANCE) */}
+      {showBudgetModal && selectedRequest && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-blue-600" />
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Budget Verification - #{selectedRequest.request_number}
+                </h3>
+              </div>
+              <button onClick={() => setShowBudgetModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyBudgetSubmit} className="space-y-4 text-xs">
+              <p className="text-gray-600">
+                Confirm budget allocation status for this requisition for <strong>{selectedRequest.department_name || "Department"}</strong>.
+              </p>
+
+              <div>
+                <label className="block font-bold text-gray-700 uppercase text-[10px] mb-2">
+                  Budget Allocated?
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 flex-1">
+                    <input
+                      type="radio"
+                      name="budgetAllocated"
+                      checked={budgetIsAllocated === true}
+                      onChange={() => setBudgetIsAllocated(true)}
+                    />
+                    <span className="font-bold text-emerald-800">YES &bull; Budgeted</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 flex-1">
+                    <input
+                      type="radio"
+                      name="budgetAllocated"
+                      checked={budgetIsAllocated === false}
+                      onChange={() => setBudgetIsAllocated(false)}
+                    />
+                    <span className="font-bold text-amber-800">NO &bull; Unbudgeted</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Finance Notes / Budget Code (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={budgetNotes}
+                  onChange={(e) => setBudgetNotes(e.target.value)}
+                  placeholder="e.g. Approved under Q4 kitchen operating expense budget"
+                  className="w-full rounded-xl border border-gray-200 p-2.5 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reviewing}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs disabled:opacity-50"
+                >
+                  {reviewing ? "Verifying..." : "Confirm Budget Verification"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PRINTABLE VOUCHER MODAL */}
+      {selectedVoucherForPrint && (
+        <PurchaseRequisitionVoucherModal
+          isOpen={!!selectedVoucherForPrint}
+          onClose={() => setSelectedVoucherForPrint(null)}
+          request={selectedVoucherForPrint}
+        />
       )}
     </div>
   );

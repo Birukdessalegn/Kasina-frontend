@@ -21,7 +21,78 @@ export default function StoreRequisitionVoucherModal({
   if (!isOpen || !transfer) return null;
 
   const handlePrint = () => {
-    window.print();
+    const printContent = printRef.current;
+    if (!printContent) {
+      window.print();
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=900,height=750");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Store Requisition - ${transfer.transfer_number || "Voucher"}</title>
+          <meta charset="utf-8">
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 12mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #0f172a;
+              background: #ffffff !important;
+              margin: 0;
+              padding: 0;
+              font-size: 11px;
+              line-height: 1.35;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11px;
+            }
+            th, td {
+              border: 1px solid #94a3b8;
+              padding: 6px 8px;
+            }
+            th {
+              background: #f1f5f9;
+              font-weight: bold;
+              text-transform: uppercase;
+              font-size: 10px;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-mono { font-family: monospace; }
+            .font-bold { font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const departmentDisplay =
