@@ -661,6 +661,9 @@ function EmployeesPage() {
         shift: form.shiftStartTime && form.shiftEndTime
           ? `${formatTimeTo12Hour(form.shiftStartTime)} - ${formatTimeTo12Hour(form.shiftEndTime)}`
           : "6:00PM - 7:00AM",
+        shiftStartTime: form.shiftStartTime || "18:00",
+        shiftEndTime: form.shiftEndTime || "07:00",
+        workHours: form.workHours ? Number(form.workHours) : 8.00,
 
         hireDate: form.hireDate || null,
         hire_date: form.hireDate || null,

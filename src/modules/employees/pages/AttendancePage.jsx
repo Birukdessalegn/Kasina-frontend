@@ -614,6 +614,11 @@ function AttendancePage() {
                         <td className="px-5 py-4">
                           <p className="font-medium text-gray-800">{record.role || "-"}</p>
                           <p className="text-xs text-gray-500">{record.department || "-"}</p>
+                          {record.shift_start_time && (
+                            <p className="text-[11px] font-semibold text-indigo-600 mt-0.5">
+                              Shift: {formatTime(`1970-01-01T${record.shift_start_time}`)} - {formatTime(`1970-01-01T${record.shift_end_time || '07:00:00'}`)}
+                            </p>
+                          )}
                         </td>
 
                         {/* Check In */}
