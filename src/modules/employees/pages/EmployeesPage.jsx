@@ -1212,7 +1212,9 @@ function EmployeesPage() {
                               {employee.status || "-"}
                             </span>
                             <p className="text-[11px] text-gray-500 mt-1">
-                              {employee.shift || "6:00PM - 7:00AM"}
+                              {employee.shift_start_time && employee.shift_end_time
+                                ? `${formatTimeTo12Hour(String(employee.shift_start_time).slice(0,5))} - ${formatTimeTo12Hour(String(employee.shift_end_time).slice(0,5))}`
+                                : (employee.shift || "6:00PM - 7:00AM")}
                             </p>
                           </div>
                         </td>
@@ -1332,7 +1334,9 @@ function EmployeesPage() {
 
                       <div className="text-right">
                         <p className="text-xs font-medium text-gray-700">
-                          {employee.shift || "-"}
+                          {employee.shift_start_time && employee.shift_end_time
+                          ? `${formatTimeTo12Hour(String(employee.shift_start_time).slice(0,5))} - ${formatTimeTo12Hour(String(employee.shift_end_time).slice(0,5))}`
+                          : (employee.shift || "-")}
                         </p>
                         <p className="mt-1 text-xs text-green-600">
                           Active
