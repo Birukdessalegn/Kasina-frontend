@@ -231,7 +231,14 @@ export default function FrontDeskPage() {
   // Filtered rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) => {
-      if (selectedStatus !== "all" && r.status !== selectedStatus) return false;
+      if (selectedStatus !== "all") {
+        if (selectedStatus === "departures") {
+          const dep = getRoomDepartureStatus(r);
+          if (!dep || (dep.severity !== "overdue_leave" && dep.severity !== "leave_today")) return false;
+        } else if (r.status !== selectedStatus) {
+          return false;
+        }
+      }
       if (selectedFloor !== "all" && String(r.floor) !== String(selectedFloor)) return false;
       if (selectedType !== "all" && String(r.room_type_id) !== String(selectedType)) return false;
       if (searchQuery.trim()) {
@@ -682,6 +689,92 @@ export default function FrontDeskPage() {
     });
   }, [rooms]);
 
+  // 12:00 PM Hotel Room Leave / Departure Status
+  const getRoomDepartureStatus = (room) => {
+    if (room.status !== "occupied") return null;
+    const checkOutRaw = String(room.check_out_date || "").split("T")[0];
+    if (!checkOutRaw) return null;
+
+    const parts = checkOutRaw.split("-").map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const [y, m, d] = parts;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    const checkOutDate = new Date(Date.UTC(y, m - 1, d));
+    const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const diffDays = Math.round((checkOutDate.getTime() - todayUTC.getTime()) / 86400000);
+
+    if (diffDays === 0) {
+      // Due today! Hotel leave time is 12:00 PM
+      const isPastNoon = currentHour > 12 || (currentHour === 12 && currentMinute >= 0);
+      if (isPastNoon) {
+        return {
+          severity: "overdue_leave",
+          isOverdue: true,
+          badgeText: "Leave Time Arrived (Past 12:00 PM)",
+          shortBadge: "Leave Now (12PM)",
+          message: "Room leave time has arrived! Check-out was scheduled for 12:00 PM today.",
+          checkOutDate: checkOutRaw,
+          diffDays: 0,
+        };
+      } else {
+        return {
+          severity: "leave_today",
+          isOverdue: false,
+          badgeText: "Leave Today by 12:00 PM",
+          shortBadge: "Due 12:00 PM",
+          message: "Guest scheduled to vacate room today by 12:00 PM.",
+          checkOutDate: checkOutRaw,
+          diffDays: 0,
+        };
+      }
+    } else if (diffDays < 0) {
+      const daysPast = Math.abs(diffDays);
+      return {
+        severity: "overdue_leave",
+        isOverdue: true,
+        badgeText: `Overdue Departure (${daysPast}d past 12:00 PM)`,
+        shortBadge: `Overdue ${daysPast}d`,
+        message: `Check-out date was ${daysPast} day(s) ago! Room leave time has passed.`,
+        checkOutDate: checkOutRaw,
+        diffDays,
+      };
+    } else if (diffDays === 1) {
+      return {
+        severity: "leave_tomorrow",
+        isOverdue: false,
+        badgeText: "Leaving Tomorrow 12:00 PM",
+        shortBadge: "Tomorrow 12PM",
+        message: "Check-out scheduled for tomorrow at 12:00 PM.",
+        checkOutDate: checkOutRaw,
+        diffDays: 1,
+      };
+    }
+
+    return null;
+  };
+
+  // Rooms that must be vacated today or are overdue past 12:00 PM
+  const departureAlertRooms = useMemo(() => {
+    return rooms
+      .filter((r) => {
+        if (r.status !== "occupied") return false;
+        const dep = getRoomDepartureStatus(r);
+        return dep && (dep.severity === "overdue_leave" || dep.severity === "leave_today");
+      })
+      .sort((a, b) => {
+        const depA = getRoomDepartureStatus(a);
+        const depB = getRoomDepartureStatus(b);
+        if (depA?.isOverdue && !depB?.isOverdue) return -1;
+        if (!depA?.isOverdue && depB?.isOverdue) return 1;
+        return 0;
+      });
+  }, [rooms]);
+
+
   // Open Payment Collection Modal
   const handleOpenPaymentModal = (room) => {
     if (!room.current_reservation_id) {
@@ -857,6 +950,30 @@ export default function FrontDeskPage() {
               {st}
             </button>
           ))}
+
+          {/* Quick Departures Filter Button */}
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(selectedStatus === "departures" ? "all" : "departures")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold transition ${
+              selectedStatus === "departures"
+                ? "bg-rose-600 text-white shadow-2xs"
+                : departureAlertRooms.length > 0
+                ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+            title="Filter rooms scheduled to vacate today or overdue"
+          >
+            <Clock size={12} className={departureAlertRooms.some((r) => getRoomDepartureStatus(r)?.isOverdue) ? "animate-pulse text-rose-500" : ""} />
+            <span>Departures (12 PM)</span>
+            {departureAlertRooms.length > 0 && (
+              <span className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                selectedStatus === "departures" ? "bg-white text-rose-700" : "bg-rose-600 text-white"
+              }`}>
+                {departureAlertRooms.length}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -996,8 +1113,10 @@ export default function FrontDeskPage() {
           {filteredRooms.map((room) => {
             const config = STATUS_CONFIG[room.status] || STATUS_CONFIG.available;
             const paymentAlert = getRoomPaymentAlert(room);
-            const isAlertUrgent = paymentAlert && (paymentAlert.severity === "expired" || paymentAlert.severity === "due_today");
-            const isAlertWarning = paymentAlert && paymentAlert.severity === "due_tomorrow";
+            const departureAlert = getRoomDepartureStatus(room);
+            const isLeaveOverdue = departureAlert?.isOverdue;
+            const isAlertUrgent = isLeaveOverdue || (paymentAlert && (paymentAlert.severity === "expired" || paymentAlert.severity === "due_today"));
+            const isAlertWarning = (departureAlert && !isLeaveOverdue) || (paymentAlert && paymentAlert.severity === "due_tomorrow");
 
             return (
               <div
@@ -1063,9 +1182,24 @@ export default function FrontDeskPage() {
                       <div className="flex items-center justify-between border-t border-rose-100/60 pt-0.5 text-[9px] text-slate-600">
                         <span>Out:</span>
                         <span className="font-semibold text-slate-800">
-                          {room.check_out_date?.split("T")[0]}
+                          {room.check_out_date?.split("T")[0]} (12:00 PM)
                         </span>
                       </div>
+
+                      {/* 12:00 PM Departure Alert on Card */}
+                      {departureAlert && (
+                        <div className={`rounded px-1.5 py-0.5 text-[8.5px] leading-tight flex items-center justify-between gap-1 ${
+                          departureAlert.isOverdue
+                            ? "bg-rose-600 text-white font-black animate-pulse shadow-2xs"
+                            : "bg-amber-400 text-slate-950 font-bold shadow-2xs"
+                        }`}>
+                          <span className="flex items-center gap-1">
+                            <Clock size={9} />
+                            <span>${departureAlert.badgeText}</span>
+                          </span>
+                          <span className="text-[7.5px] uppercase opacity-90 font-mono">12 PM</span>
+                        </div>
+                      )}
 
                       {/* Payment Coverage & Balance Badge */}
                       {paymentAlert && (

@@ -18,7 +18,8 @@ import {
   Upload,
   Plus,
   BedDouble,
-  Mail
+  Mail,
+  Clock
 } from "lucide-react";
 import {
   getReservations,
@@ -41,8 +42,61 @@ const STATUS_COLORS = {
   no_show: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
+
+// Helper: 12:00 PM Room Departure Alert for Kasina Hotel
+function getReservationDepartureAlert(r) {
+  if (r.status !== "checked_in" || !r.check_out_date) return null;
+
+  const checkOutRaw = String(r.check_out_date).split("T")[0];
+  const parts = checkOutRaw.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return null;
+
+  const [y, m, d] = parts;
+  const checkOutDate = new Date(Date.UTC(y, m - 1, d));
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const diffDays = Math.round((checkOutDate.getTime() - todayUTC.getTime()) / 86400000);
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  if (diffDays === 0) {
+    // Due today! Hotel leave time is strictly 12:00 PM
+    const isPastNoon = currentHour > 12 || (currentHour === 12 && currentMinute >= 0);
+    if (isPastNoon) {
+      return {
+        severity: "overdue_leave",
+        isOverdue: true,
+        badgeText: "Leave Time Arrived (Past 12:00 PM)",
+        shortBadge: "Leave Now (12 PM)",
+        diffDays: 0,
+      };
+    } else {
+      return {
+        severity: "leave_today",
+        isOverdue: false,
+        badgeText: "Leave Today by 12:00 PM",
+        shortBadge: "Due 12:00 PM",
+        diffDays: 0,
+      };
+    }
+  } else if (diffDays < 0) {
+    return {
+      severity: "overdue_leave",
+      isOverdue: true,
+      badgeText: "Overdue Leave (" + Math.abs(diffDays) + "d past 12 PM)",
+      shortBadge: "Overdue Leave",
+      diffDays,
+    };
+  }
+
+  return null;
+}
+
 export default function ReservationsListPage() {
   const today = new Date().toISOString().split("T")[0];
+  const departureAlerts = reservations.filter((r) => getReservationDepartureAlert(r) !== null);
+  const overdueDeparturesCount = departureAlerts.filter((r) => getReservationDepartureAlert(r)?.isOverdue).length;
+
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
   const [reservations, setReservations] = useState([]);
@@ -525,6 +579,8 @@ export default function ReservationsListPage() {
                 }
               }
 
+              const departureAlert = getReservationDepartureAlert(r);
+
               return (
                 <tr key={r.id} className="hover:bg-slate-50/80 transition">
                   <td className="px-6 py-4 font-mono font-bold text-blue-600">
@@ -623,6 +679,21 @@ export default function ReservationsListPage() {
                   <td className="px-6 py-4 text-xs">
                     <p className="text-slate-800 font-medium">In: {r.check_in_date?.split("T")[0]}</p>
                     <p className="text-slate-500">Out: {r.check_out_date?.split("T")[0]}</p>
+                    {departureAlert && (
+                      <div className="mt-1">
+                        {departureAlert.isOverdue ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-black text-white animate-pulse shadow-2xs">
+                            <Clock size={10} />
+                            {departureAlert.badgeText}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow-2xs">
+                            <Clock size={10} />
+                            {departureAlert.badgeText}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <p className="text-[11px] text-slate-400 mt-0.5">{totalNights} Night(s)</p>
                   </td>
                   <td className="px-6 py-4 text-xs">
