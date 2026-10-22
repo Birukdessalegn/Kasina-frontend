@@ -360,11 +360,6 @@ const navigationGroups = [
             path: "/employees/leave",
             icon: CalendarDays,
           },
-          {
-            name: "Payroll Management",
-            path: "/employees/payroll",
-            icon: DollarSign,
-          },
         ],
       },
 

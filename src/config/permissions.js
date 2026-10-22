@@ -61,7 +61,6 @@ export const ROLE_PERMISSIONS = {
     "finance.view",
     "cashier.reconcile",
     "employees.view",
-    "payroll.view",
     "supervisor.view",
   ],
 
@@ -197,7 +196,6 @@ export const ROLE_PERMISSIONS = {
     "attendance.view",
     "attendance.manage",
     "leave.view",
-    "payroll.view",
     "reports.view",
   ],
 
@@ -206,7 +204,6 @@ export const ROLE_PERMISSIONS = {
     "employees.view",
     "attendance.view",
     "leave.view",
-    "payroll.view",
   ],
 
   [ROLES.HOUSEKEEPING_MANAGER]: [
