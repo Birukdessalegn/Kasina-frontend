@@ -7,6 +7,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import SubscriptionBadge from "../components/subscription/SubscriptionBadge";
 
 function AppHeader({
   title = "Dashboard",
@@ -72,6 +73,9 @@ function AppHeader({
       {/* ================= RIGHT ================= */}
 
       <div className="flex items-center gap-4">
+
+        {/* Subscription Badge for Management */}
+        <SubscriptionBadge />
 
         {/* Online Status */}
 
