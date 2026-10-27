@@ -47,7 +47,8 @@ import {
   checkOutReservation,
   addReservationPayment,
   cancelReservation,
-  updateRoomStatus
+  updateRoomStatus,
+  amendReservationPrice
 } from "../services/frontdeskApi";
 
 const STATUS_CONFIG = {
