@@ -545,28 +545,68 @@ export default function FinanceDashboardPage() {
       ============================================================ */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left 2 Cols: Live Multi-Department Ledger Stream */}
-        <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="lg:col-span-2 rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-3.5 sm:p-6 shadow-xs space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 sm:pb-4 gap-2">
             <div>
-              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                <FileText className="h-4 sm:h-5 w-4 sm:w-5 text-blue-600 shrink-0" />
                 Live Multi-Department Audit Stream
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                 Real-time stream of verified payments across Rooms, Dining, and Bar.
               </p>
             </div>
             <Link
               to="/finance/sales"
-              className="text-xs font-extrabold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              className="text-xs font-extrabold text-blue-600 hover:text-blue-700 flex items-center gap-1 self-start sm:self-auto"
             >
               View All Sales
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          {/* Smartphone Optimized Card List (< sm / 360px screens) */}
+          <div className="divide-y divide-slate-100 sm:hidden">
+            {recentTransactions.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 font-medium text-xs">
+                No recorded multi-department transactions found.
+              </div>
+            ) : (
+              recentTransactions.map((tx) => {
+                const DeptIcon = tx.deptIcon;
+                return (
+                  <div key={tx.id} className="py-2.5 flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[11px] font-bold text-slate-900">
+                          {tx.code}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold border ${tx.deptColor}`}>
+                          <DeptIcon className="h-2.5 w-2.5" />
+                          {tx.department}
+                        </span>
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 uppercase">
+                          {tx.method}
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-slate-800 truncate">
+                        {tx.title}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-mono text-xs font-black text-slate-900">
+                        {formatMoney(tx.amount)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Tablet & Desktop Full Table View (>= sm screens) */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-xs">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5">Code / Ref</th>
@@ -618,7 +658,7 @@ export default function FinanceDashboardPage() {
         </div>
 
         {/* Right Col: Cashier Drawer Reconciliation Status */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4 flex flex-col justify-between">
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-3.5 sm:p-6 shadow-xs space-y-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
