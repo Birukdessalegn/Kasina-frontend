@@ -1,4 +1,6 @@
 import UserProfileModal from "../components/UserProfileModal";
+import SubscriptionBanner from "../components/subscription/SubscriptionBanner";
+import SubscriptionBadge from "../components/subscription/SubscriptionBadge";
 import { useState, useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
