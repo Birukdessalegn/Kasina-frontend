@@ -22,6 +22,11 @@ function ProtectedRoute() {
     return <Navigate to="/login" replace />;
   }
 
+  // Hard lockout screen if subscription expired past grace period (RBMS / Oak Club style)
+  if (subscription?.isExpired) {
+    return <SubscriptionLockScreen />;
+  }
+
   return <Outlet />;
 }
 
