@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import AmendRoomPriceModal from "../components/AmendRoomPriceModal";
 import {
   BedDouble,
   DoorClosed,
@@ -30,7 +31,8 @@ import {
   Loader2,
   Crown,
   Lock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Tag
 } from "lucide-react";
 import {
   getRooms,
@@ -87,6 +89,39 @@ const STATUS_CONFIG = {
 };
 
 export default function FrontDeskPage() {
+  // Special Guest Price Amendment
+  const [amendPriceModalOpen, setAmendPriceModalOpen] = useState(false);
+  const [selectedAmendRoom, setSelectedAmendRoom] = useState(null);
+
+  const handleOpenAmendPrice = (room) => {
+    if (!room.current_reservation_id) {
+      showToast("No active reservation found on this room", "error");
+      return;
+    }
+    const totalNights = Number(room.total_nights || 1);
+    const totalAmount = Number(room.total_amount || 0);
+    const ratePerNight = Number(room.rate_per_night) > 0 
+      ? Number(room.rate_per_night) 
+      : (totalNights > 0 && totalAmount > 0 ? totalAmount / totalNights : Number(room.price || 0));
+
+    setSelectedAmendRoom({
+      id: room.current_reservation_id,
+      room_number: room.room_number,
+      room_type_name: room.type_name,
+      guest_name: room.guest_name,
+      rate_per_night: ratePerNight,
+      total_nights: totalNights,
+      total_amount: totalAmount > 0 ? totalAmount : ratePerNight * totalNights,
+    });
+    setAmendPriceModalOpen(true);
+  };
+
+  const handleAmendPriceSuccess = async ({ reservationId, rate_per_night, reason }) => {
+    const res = await amendReservationPrice(reservationId, { rate_per_night, reason });
+    showToast(res.message || "Room price amended successfully and notification dispatched to Admin & Finance.");
+    loadData();
+  };
+
   const [rooms, setRooms] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
   const [stats, setStats] = useState({ total: 0, available: 0, occupied: 0, reserved: 0, cleaning: 0, maintenance: 0, occupancyRate: 0 });
@@ -1378,6 +1413,18 @@ export default function FrontDeskPage() {
                   {room.status === "occupied" && (
                     <div className="flex gap-1">
                       <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAmendPrice(room);
+                        }}
+                        className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 hover:bg-amber-100 transition flex items-center justify-center gap-0.5 shadow-2xs cursor-pointer"
+                        title="Amend Price for Special Guest"
+                      >
+                        <Tag size={10} className="text-amber-700" />
+                        Price
+                      </button>
+                      <button
                         onClick={() => handleOpenUpdateIdModal(room)}
                         className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-0.5 shadow-2xs"
                         title="Update ID / Guest details"
@@ -1410,6 +1457,18 @@ export default function FrontDeskPage() {
 
                   {room.status === "reserved" && (
                     <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAmendPrice(room);
+                        }}
+                        className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 hover:bg-amber-100 transition flex items-center justify-center gap-0.5 shadow-2xs cursor-pointer"
+                        title="Amend Price for Special Guest"
+                      >
+                        <Tag size={10} className="text-amber-700" />
+                        Price
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -3101,6 +3160,17 @@ export default function FrontDeskPage() {
           </div>
         </div>
       )}
+    
+      {/* Amend Room Price Modal for Special Guests */}
+      <AmendRoomPriceModal
+        isOpen={amendPriceModalOpen}
+        onClose={() => {
+          setAmendPriceModalOpen(false);
+          setSelectedAmendRoom(null);
+        }}
+        reservation={selectedAmendRoom}
+        onSuccess={handleAmendPriceSuccess}
+      />
     </div>
   );
 }

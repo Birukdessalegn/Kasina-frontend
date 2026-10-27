@@ -190,3 +190,9 @@ export const getReservationReports = (params = {}) => {
 
 export const getVipCustomers = () => Promise.resolve([]);
 
+
+export const amendReservationPrice = (id, data) =>
+  api(`/room-reservations/${id}/amend-price`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });

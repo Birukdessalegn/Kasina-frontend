@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import AmendRoomPriceModal from "../components/AmendRoomPriceModal";
 import {
   CalendarDays,
   Search,
@@ -19,7 +20,8 @@ import {
   Plus,
   BedDouble,
   Mail,
-  Clock
+  Clock,
+  DollarSign
 } from "lucide-react";
 import {
   getReservations,
@@ -32,6 +34,7 @@ import {
   uploadStandaloneGuestId,
   createReservation,
   getRooms,
+  amendReservationPrice,
 } from "../services/frontdeskApi";
 
 const STATUS_COLORS = {
@@ -93,6 +96,21 @@ function getReservationDepartureAlert(r) {
 }
 
 export default function ReservationsListPage() {
+  // Special Guest Price Amendment
+  const [amendPriceModalOpen, setAmendPriceModalOpen] = useState(false);
+  const [selectedAmendRes, setSelectedAmendRes] = useState(null);
+
+  const handleOpenAmendPrice = (r) => {
+    setSelectedAmendRes(r);
+    setAmendPriceModalOpen(true);
+  };
+
+  const handleAmendPriceSuccess = async ({ reservationId, rate_per_night, reason }) => {
+    const res = await amendReservationPrice(reservationId, { rate_per_night, reason });
+    showToast(res.message || "Room price amended successfully and notification dispatched to Admin & Finance.");
+    loadReservations();
+  };
+
   const today = new Date().toISOString().split("T")[0];
   const departureAlerts = reservations.filter((r) => getReservationDepartureAlert(r) !== null);
   const overdueDeparturesCount = departureAlerts.filter((r) => getReservationDepartureAlert(r)?.isOverdue).length;
@@ -754,6 +772,18 @@ export default function ReservationsListPage() {
                         <Camera size={12} className="text-blue-600" />
                         ID / Edit
                       </button>
+
+                      {(r.status === "confirmed" || r.status === "checked_in") && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAmendPrice(r)}
+                          className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900 hover:bg-amber-100 transition flex items-center gap-1 shadow-sm cursor-pointer"
+                          title="Amend Room Price for Special Guest"
+                        >
+                          <DollarSign size={12} className="text-amber-700" />
+                          Amend Price
+                        </button>
+                      )}
 
                       {r.status === "confirmed" && (
                         <button
@@ -1791,6 +1821,17 @@ export default function ReservationsListPage() {
           </div>
         </div>
       )}
+    
+      {/* Amend Room Price Modal for Special Guests */}
+      <AmendRoomPriceModal
+        isOpen={amendPriceModalOpen}
+        onClose={() => {
+          setAmendPriceModalOpen(false);
+          setSelectedAmendRes(null);
+        }}
+        reservation={selectedAmendRes}
+        onSuccess={handleAmendPriceSuccess}
+      />
     </div>
   );
 }
