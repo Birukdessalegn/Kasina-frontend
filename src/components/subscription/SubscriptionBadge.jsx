@@ -5,10 +5,8 @@ export default function SubscriptionBadge() {
   const { subscription } = useSubscription();
   const { user } = useAuth();
 
-  // Only show badge to Admins, Owners, or Managers
-  const role = String(user?.role || "").toLowerCase();
-  const isManagerOrAdmin = ["admin", "superadmin", "owner", "manager"].includes(role);
-  if (!isManagerOrAdmin) return null;
+  // Show badge to any authenticated user in Kasina
+  if (!user) return null;
 
   const { status, daysRemaining, isGracePeriod, graceDaysRemaining } = subscription;
 
@@ -32,7 +30,7 @@ export default function SubscriptionBadge() {
 
   return (
     <div
-      className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold shadow-2xs select-none ${badgeClasses}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold shadow-2xs select-none ${badgeClasses}`}
       title="Monthly Subscription Status (Managed Remotely by AmbbaTech)"
     >
       <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />

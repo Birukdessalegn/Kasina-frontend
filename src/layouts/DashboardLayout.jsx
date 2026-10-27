@@ -1544,6 +1544,9 @@ function DashboardLayout() {
 
             </div>
 
+            {/* Subscription Day Counter */}
+            <SubscriptionBadge />
+
             {/* DIVIDER */}
 
             <div className="h-6 w-px bg-slate-200 hidden sm:block" />
@@ -1667,6 +1670,9 @@ function DashboardLayout() {
           </div>
 
         </header>
+
+        {/* Subscription Warning / Grace Period Banner */}
+        <SubscriptionBanner />
 
         {/* ===================================================
             BODY
