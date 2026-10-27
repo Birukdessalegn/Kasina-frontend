@@ -88,6 +88,75 @@ const STATUS_CONFIG = {
   },
 };
 
+// 12:00 PM Hotel Room Leave / Departure Status (Pure Helper - Hoisted)
+function getRoomDepartureStatus(room) {
+  if (!room || room.status !== "occupied") return null;
+  const checkOutRaw = String(room.check_out_date || "").split("T")[0];
+  if (!checkOutRaw) return null;
+
+  const parts = checkOutRaw.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return null;
+  const [y, m, d] = parts;
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  const checkOutDate = new Date(Date.UTC(y, m - 1, d));
+  const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const diffDays = Math.round((checkOutDate.getTime() - todayUTC.getTime()) / 86400000);
+
+  if (diffDays === 0) {
+    // Due today! Hotel leave time is 12:00 PM
+    const isPastNoon = currentHour > 12 || (currentHour === 12 && currentMinute >= 0);
+    if (isPastNoon) {
+      return {
+        severity: "overdue_leave",
+        isOverdue: true,
+        badgeText: "Leave Time Arrived (Past 12:00 PM)",
+        shortBadge: "Leave Now (12PM)",
+        message: "Room leave time has arrived! Check-out was scheduled for 12:00 PM today.",
+        checkOutDate: checkOutRaw,
+        diffDays: 0,
+      };
+    } else {
+      return {
+        severity: "leave_today",
+        isOverdue: false,
+        badgeText: "Leave Today by 12:00 PM",
+        shortBadge: "Due 12:00 PM",
+        message: "Guest scheduled to vacate room today by 12:00 PM.",
+        checkOutDate: checkOutRaw,
+        diffDays: 0,
+      };
+    }
+  } else if (diffDays < 0) {
+    const daysPast = Math.abs(diffDays);
+    return {
+      severity: "overdue_leave",
+      isOverdue: true,
+      badgeText: `Overdue Departure (${daysPast}d past 12:00 PM)`,
+      shortBadge: `Overdue ${daysPast}d`,
+      message: `Check-out date was ${daysPast} day(s) ago! Room leave time has passed.`,
+      checkOutDate: checkOutRaw,
+      diffDays,
+    };
+  } else if (diffDays === 1) {
+    return {
+      severity: "leave_tomorrow",
+      isOverdue: false,
+      badgeText: "Leaving Tomorrow 12:00 PM",
+      shortBadge: "Tomorrow 12PM",
+      message: "Check-out scheduled for tomorrow at 12:00 PM.",
+      checkOutDate: checkOutRaw,
+      diffDays: 1,
+    };
+  }
+
+  return null;
+}
+
+
 export default function FrontDeskPage() {
   // Special Guest Price Amendment
   const [amendPriceModalOpen, setAmendPriceModalOpen] = useState(false);
@@ -724,73 +793,7 @@ export default function FrontDeskPage() {
     });
   }, [rooms]);
 
-  // 12:00 PM Hotel Room Leave / Departure Status
-  const getRoomDepartureStatus = (room) => {
-    if (room.status !== "occupied") return null;
-    const checkOutRaw = String(room.check_out_date || "").split("T")[0];
-    if (!checkOutRaw) return null;
-
-    const parts = checkOutRaw.split("-").map(Number);
-    if (parts.length !== 3 || parts.some(isNaN)) return null;
-    const [y, m, d] = parts;
-
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-
-    const checkOutDate = new Date(Date.UTC(y, m - 1, d));
-    const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-    const diffDays = Math.round((checkOutDate.getTime() - todayUTC.getTime()) / 86400000);
-
-    if (diffDays === 0) {
-      // Due today! Hotel leave time is 12:00 PM
-      const isPastNoon = currentHour > 12 || (currentHour === 12 && currentMinute >= 0);
-      if (isPastNoon) {
-        return {
-          severity: "overdue_leave",
-          isOverdue: true,
-          badgeText: "Leave Time Arrived (Past 12:00 PM)",
-          shortBadge: "Leave Now (12PM)",
-          message: "Room leave time has arrived! Check-out was scheduled for 12:00 PM today.",
-          checkOutDate: checkOutRaw,
-          diffDays: 0,
-        };
-      } else {
-        return {
-          severity: "leave_today",
-          isOverdue: false,
-          badgeText: "Leave Today by 12:00 PM",
-          shortBadge: "Due 12:00 PM",
-          message: "Guest scheduled to vacate room today by 12:00 PM.",
-          checkOutDate: checkOutRaw,
-          diffDays: 0,
-        };
-      }
-    } else if (diffDays < 0) {
-      const daysPast = Math.abs(diffDays);
-      return {
-        severity: "overdue_leave",
-        isOverdue: true,
-        badgeText: `Overdue Departure (${daysPast}d past 12:00 PM)`,
-        shortBadge: `Overdue ${daysPast}d`,
-        message: `Check-out date was ${daysPast} day(s) ago! Room leave time has passed.`,
-        checkOutDate: checkOutRaw,
-        diffDays,
-      };
-    } else if (diffDays === 1) {
-      return {
-        severity: "leave_tomorrow",
-        isOverdue: false,
-        badgeText: "Leaving Tomorrow 12:00 PM",
-        shortBadge: "Tomorrow 12PM",
-        message: "Check-out scheduled for tomorrow at 12:00 PM.",
-        checkOutDate: checkOutRaw,
-        diffDays: 1,
-      };
-    }
-
-    return null;
-  };
+  // getRoomDepartureStatus moved to top-level helper
 
   // Rooms that must be vacated today or are overdue past 12:00 PM
   const departureAlertRooms = useMemo(() => {
