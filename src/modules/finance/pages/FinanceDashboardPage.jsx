@@ -565,55 +565,24 @@ export default function FinanceDashboardPage() {
             </Link>
           </div>
 
-          {/* Smartphone Optimized Card List (< sm / 360px screens) */}
-          <div className="divide-y divide-slate-100 sm:hidden">
-            {recentTransactions.length === 0 ? (
-              <div className="py-6 text-center text-slate-400 font-medium text-xs">
-                No recorded multi-department transactions found.
-              </div>
-            ) : (
-              recentTransactions.map((tx) => {
-                const DeptIcon = tx.deptIcon;
-                return (
-                  <div key={tx.id} className="py-2.5 flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono text-[11px] font-bold text-slate-900">
-                          {tx.code}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold border ${tx.deptColor}`}>
-                          <DeptIcon className="h-2.5 w-2.5" />
-                          {tx.department}
-                        </span>
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 uppercase">
-                          {tx.method}
-                        </span>
-                      </div>
-                      <p className="text-xs font-medium text-slate-800 truncate">
-                        {tx.title}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="font-mono text-xs font-black text-slate-900">
-                        {formatMoney(tx.amount)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          {/* Mobile Horizontal Scroll Cue */}
+          <div className="flex sm:hidden items-center justify-between text-[11px] font-medium text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/80">
+            <span>Table View</span>
+            <span className="flex items-center gap-1 text-blue-600 font-bold">
+              Swipe horizontally &rarr;
+            </span>
           </div>
 
-          {/* Tablet & Desktop Full Table View (>= sm screens) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-xs">
+          {/* Smooth Horizontal Sliding Table for All Devices */}
+          <div className="overflow-x-auto touch-pan-x pb-2 scrollbar-thin">
+            <table className="w-full min-w-[620px] text-left text-xs">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase text-slate-500">
                 <tr>
-                  <th className="px-3 py-2.5">Code / Ref</th>
-                  <th className="px-3 py-2.5">Department</th>
-                  <th className="px-3 py-2.5">Description</th>
-                  <th className="px-3 py-2.5">Method</th>
-                  <th className="px-3 py-2.5 text-right">Amount (ETB)</th>
+                  <th className="px-3.5 py-2.5 whitespace-nowrap">Code / Ref</th>
+                  <th className="px-3.5 py-2.5 whitespace-nowrap">Department</th>
+                  <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[150px]">Description</th>
+                  <th className="px-3.5 py-2.5 whitespace-nowrap">Method</th>
+                  <th className="px-3.5 py-2.5 text-right whitespace-nowrap">Amount (ETB)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -628,24 +597,24 @@ export default function FinanceDashboardPage() {
                     const DeptIcon = tx.deptIcon;
                     return (
                       <tr key={tx.id} className="hover:bg-slate-50/60 transition">
-                        <td className="px-3 py-3 font-mono font-bold text-slate-900">
+                        <td className="px-3.5 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">
                           {tx.code}
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="px-3.5 py-3 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border ${tx.deptColor}`}>
                             <DeptIcon className="h-3 w-3" />
                             {tx.department}
                           </span>
                         </td>
-                        <td className="px-3 py-3 font-semibold text-slate-700">
+                        <td className="px-3.5 py-3 font-semibold text-slate-700 whitespace-nowrap">
                           {tx.title}
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="px-3.5 py-3 whitespace-nowrap">
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 uppercase">
                             {tx.method}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right font-black text-slate-900 font-mono">
+                        <td className="px-3.5 py-3 text-right font-black text-slate-900 font-mono whitespace-nowrap">
                           {formatMoney(tx.amount)}
                         </td>
                       </tr>
